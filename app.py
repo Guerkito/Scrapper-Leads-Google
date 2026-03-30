@@ -111,7 +111,10 @@ with st.sidebar:
         barrios = [tipo_zona] # El nombre de la zona (Sur, Norte, etc)
     
     st.divider()
-    max_res_per_zone = st.slider("Resultados por barrio", 5, 100, 20)
+    col_inf1, col_inf2 = st.columns(2)
+    with col_inf1: modo_infinito = st.toggle("♾️ Modo Infinito", value=False, help="Ignora el límite y busca hasta que des a PARAR")
+    with col_inf2: max_res_per_zone = st.number_input("Resultados por barrio", 5, 1000, 20)
+    
     ver_nav = st.checkbox("👁️ Ver navegador", value=False)
     
     col1, col2 = st.columns(2)
@@ -119,17 +122,23 @@ with st.sidebar:
     with col2: stop = st.button("🛑 PARAR")
 
 # --- SCRAPER ENGINE ---
-async def scrape_zone(context, query, max_results, city, country, nicho_val):
+async def scrape_zone(context, query, max_results, city, country, nicho_val, infinito):
     page = await context.new_page()
     
     # Placeholders para estadísticas en vivo
     col_stat1, col_stat2, col_stat3 = st.columns(3)
-    with col_stat1: st.markdown("#### 🎯 Objetivo"); p_bar = st.progress(0)
+    with col_stat1: 
+        st.markdown("#### 🎯 Objetivo")
+        obj_text = st.empty()
+        p_bar = st.progress(0)
     with col_stat2: st.markdown("#### 🔥 Encontrados"); count_text = st.empty()
     with col_stat3: st.markdown("#### 🔍 Auditados"); audit_text = st.empty()
     
     log_area = st.expander("Registro de actividad en vivo", expanded=True)
     
+    if infinito: obj_text.markdown("✨ **SIN LÍMITE** (Buscando todo)")
+    else: obj_text.markdown(f"🚩 **{max_results}** resultados")
+
     try:
         search_url = f"https://www.google.com/maps/search/{urllib.parse.quote(query)}/?hl=es"
         log_area.write(f"🌐 Navegando a: {query}...")
@@ -149,8 +158,9 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val):
         found = 0
         audited = 0
         processed_names = set()
+        scroll_attempts = 0
         
-        while found < max_results and not st.session_state.get('stop_requested', False):
+        while (infinito or found < max_results) and not st.session_state.get('stop_requested', False):
             items = await page.query_selector_all("a.hfpxzc")
             if not items: 
                 log_area.write("⚠️ No se encontraron resultados en el mapa.")
@@ -161,17 +171,22 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val):
                 feed = await page.query_selector("div[role='feed']")
                 if feed:
                     log_area.write("🔄 Cargando más resultados...")
-                    await feed.evaluate("el => el.scrollBy(0, 2000)")
+                    await feed.evaluate("el => el.scrollBy(0, 3000)")
                     await asyncio.sleep(3)
                     new_items = await page.query_selector_all("a.hfpxzc")
                     if len(new_items) == len(items):
-                        log_area.write("🏁 Fin de los resultados.")
-                        break
-                    continue
+                        scroll_attempts += 1
+                        if scroll_attempts > 3: # Intentar 3 veces antes de rendirse
+                            log_area.write("🏁 Fin de los resultados disponibles en esta zona.")
+                            break
+                        continue
+                    else:
+                        scroll_attempts = 0 # Reiniciar si cargó nuevos
+                        continue
                 else:
                     break
 
-            # Procesar el siguiente item por índice para evitar duplicados en la sesión actual
+            # Procesar el siguiente item por índice
             item = items[audited]
             audited += 1
             
@@ -194,14 +209,14 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val):
                     await asyncio.sleep(0.5)
                 
                 if not web_btn:
-                    # EXTRAER CATEGORÍA / TIPO (Ej: "Clínica dental")
+                    # EXTRAER CATEGORÍA / TIPO
                     tipo_el = await page.query_selector('button[class="Dener"]')
                     tipo_txt = await tipo_el.inner_text() if tipo_el else "N/A"
                     
                     phone_el = await page.query_selector('button[data-item-id^="phone:tel:"]')
                     phone = await phone_el.inner_text() if phone_el else "N/A"
                     
-                    # Extraer y formatear Rating (Ej: "4.5 / 5")
+                    # Extraer y formatear Rating
                     rating_el = await page.query_selector("span[aria-label*='estrellas']")
                     rating_raw = await rating_el.get_attribute("aria-label") if rating_el else "N/A"
                     if rating_raw != "N/A":
@@ -216,7 +231,9 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val):
                     
                     # Actualizar Dashboard
                     count_text.metric("Leads Calificados", found)
-                    p_bar.progress(min(found / max_results, 1.0))
+                    if not infinito: p_bar.progress(min(found / max_results, 1.0))
+                    else: p_bar.progress(0.99) # Mantener barra casi llena en modo infinito
+                    
                     log_area.write(f"✅ **ENCONTRADO:** {name} (Sin web)")
                 else:
                     log_area.write(f"⏭️ *Saltado:* {name} (Tiene web)")
@@ -229,7 +246,7 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val):
     finally:
         await page.close()
 
-async def main_loop(n, city_base, p, barrios_list, max_r, v):
+async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito):
     st.session_state.stop_requested = False
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=not v)
@@ -242,13 +259,13 @@ async def main_loop(n, city_base, p, barrios_list, max_r, v):
                 
             st.toast(f"📍 Procesando {barrio} ({i+1}/{total_barrios})")
             query = f"{n} en {barrio}, {city_base}, {p}"
-            await scrape_zone(context, query, max_r, city_base, p, n)
+            await scrape_zone(context, query, max_r, city_base, p, n, infinito)
             
         await browser.close()
     st.success("🏁 ¡Tarea masiva completada!")
 
 if start:
-    asyncio.run(main_loop(nicho, ciudad_base, pais, barrios, max_res_per_zone, ver_nav))
+    asyncio.run(main_loop(nicho, ciudad_base, pais, barrios, max_res_per_zone, ver_nav, modo_infinito))
     st.rerun()
 
 if stop:
