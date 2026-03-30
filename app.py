@@ -440,38 +440,46 @@ async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito):
         browser = await pw.chromium.launch(headless=not v)
         context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         
+        # LISTA DE CATEGORÍAS PARA BARRIDO TOTAL (Deep Scan)
+        # Extraemos todos los sub-nichos del diccionario global para no dejar ni uno fuera
+        DEEP_SCAN_LIST = []
+        for sub_list in NICHOS_DICT.values():
+            DEEP_SCAN_LIST.extend(sub_list)
+        
+        # Eliminar duplicados y el ítem de "Todo el mercado"
+        DEEP_SCAN_LIST = sorted(list(set(DEEP_SCAN_LIST)))
+        if "Todos los Negocios (General)" in DEEP_SCAN_LIST: DEEP_SCAN_LIST.remove("Todos los Negocios (General)")
+
         total_barrios = len(barrios_list)
         leads_sesion = 0
         
         for i, barrio in enumerate(barrios_list):
             if st.session_state.get('stop_requested', False):
-                st.warning(f"🛑 Extracción detenida por el usuario. Se procesaron {i} de {total_barrios} zonas.")
+                st.warning(f"🛑 Detenido. Zonas procesadas: {i}/{total_barrios}")
                 break
             
-            # OPTIMIZACIÓN DE TÉRMINOS PARA BÚSQUEDA TOTAL
-            if n == "Todos los Negocios (General)":
-                search_nicho = "negocios"
-            elif n == "Establecimientos Comerciales":
-                search_nicho = "establecimientos"
-            elif n == "Empresas y Servicios":
-                search_nicho = "servicios"
+            # DETERMINAR QUÉ BUSCAR
+            if n == "Todos los Negocios (General)" and infinito:
+                # MODO DEEP SCAN: Iterar por TODOS los sub-nichos del sistema
+                search_list = DEEP_SCAN_LIST
+                st.toast(f"🚀 INICIANDO DEEP SCAN EN {barrio or city_base}")
+            elif n == "Todos los Negocios (General)":
+                # MODO BARRIDO RÁPIDO: Solo categorías principales
+                search_list = ["odontologos", "restaurantes", "talleres", "inmobiliarias", "peluquerias", "abogados", "tiendas", "hoteles", "colegios"]
             else:
-                search_nicho = n
+                search_list = [n]
 
-            # CONSTRUCCIÓN NATURAL DE LA CONSULTA
-            if barrio:
-                query = f"{search_nicho} en {barrio}, {city_base}, {p}"
-            else:
-                query = f"{search_nicho} en {city_base}, {p}"
+            for search_nicho in search_list:
+                if st.session_state.get('stop_requested', False): break
+                
+                query = f"{search_nicho} en {barrio}, {city_base}, {p}" if barrio else f"{search_nicho} en {city_base}, {p}"
 
-            st.toast(f"📍 Iniciando: {query}")
+                st.toast(f"🔎 Analizando: {search_nicho}")
+                encontrados_zona = await scrape_zone(context, query, max_r, city_base, p, n, infinito)
+                leads_sesion += encontrados_zona
             
-            # Ejecutar y capturar resultados de esta zona
-            encontrados_zona = await scrape_zone(context, query, max_r, city_base, p, n, infinito)
-            leads_sesion += encontrados_zona
-            
-            if encontrados_zona > 0:
-                st.toast(f"✅ ¡Zona completada! +{encontrados_zona} leads", icon="🔥")
+            if leads_sesion > 0:
+                st.toast(f"✅ ¡Zona completada! +{leads_sesion} leads totales", icon="🔥")
             
         await browser.close()
         
