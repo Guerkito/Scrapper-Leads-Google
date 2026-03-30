@@ -205,12 +205,29 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- HEADER SECTION ---
+if 'last_summary' not in st.session_state:
+    st.session_state.last_summary = None
+
 col_head1, col_head2 = st.columns([0.8, 0.2])
 with col_head1:
     st.markdown("<h1 style='font-size: 3.5em; margin-bottom:0;'>LEAD GEN <span class='neon-text'>PRO</span></h1>", unsafe_allow_html=True)
     st.markdown("<p style='color: #666; font-size: 1.1em; margin-top:-5px;'>INTELIGENCIA GEOGRÁFICA DE ALTA PRECISIÓN</p>", unsafe_allow_html=True)
 with col_head2:
     st.markdown("<div style='text-align:right; margin-top:20px;'><span style='background:#111; padding:8px 15px; border-radius:50px; border:1px solid #333; color:#555; font-size:0.8em; font-weight:bold;'>STABLE BUILD v10.1</span></div>", unsafe_allow_html=True)
+
+# --- DISPLAY LAST SUMMARY ---
+if st.session_state.last_summary:
+    st.balloons()
+    st.markdown(f"""
+        <div class='bento-card' style='border-color: #39FF14; text-align: center; margin-top: 20px;'>
+            <h2 class='neon-text'>🏁 RESUMEN DE OPERACIÓN FINALIZADA</h2>
+            <p style='font-size: 2em; margin-bottom: 0;'><b>{st.session_state.last_summary['leads']}</b></p>
+            <p style='color: #888; margin-bottom: 20px;'>Nuevos prospectos calificados capturados</p>
+        </div>
+    """, unsafe_allow_html=True)
+    if st.button("Cerrar Resumen"):
+        st.session_state.last_summary = None
+        st.rerun()
 
 st.divider()
 
@@ -242,19 +259,20 @@ with st.sidebar:
     with st.expander("🎯 NICHO Y SECTOR", expanded=True):
         NICHOS_DICT = {
             "🌎 TODO EL MERCADO": ["Todos los Negocios (General)", "Establecimientos Comerciales", "Empresas y Servicios"],
-            "🏥 SALUD & BIENESTAR": ["Odontólogos", "Psicólogos", "Fisioterapeutas", "Ópticas", "Centros Médicos", "Ginecólogos", "Dermatólogos", "Cardiólogos", "Centros de Estética", "Nutricionistas", "Podólogos"],
-            "🍽️ GASTRONOMÍA": ["Restaurantes", "Cafeterías", "Pizzerías", "Hamburgueserías", "Panaderías", "Bares", "Sushi", "Catering", "Heladerías", "Asaderos de Pollo"],
-            "🚗 AUTOMOTRIZ": ["Talleres Mecánicos", "Concesionarios", "Lavado de Autos (Spa)", "Venta de Repuestos", "Llantas/Neumáticos", "Alquiler de Vehículos", "Centros de Diagnóstico (CDA)"],
-            "🏠 HOGAR & REAL ESTATE": ["Inmobiliarias", "Reformas Integrales", "Pintores", "Cerrajeros", "Electricistas", "Fontaneros/Plomeros", "Carpinterías", "Vidrierías", "Mueblerías", "Decoración"],
-            "💄 BELLEZA": ["Peluquerías", "Barberías", "Spas", "Centros de Uñas (Nails)", "Estética Facial", "Tatuajes (Tattoo Shops)", "Gimnasios/Crossfit", "Centros de Yoga"],
-            "⚖️ LEGAL & PROFESIONAL": ["Abogados", "Contadores/Contables", "Notarías", "Arquitectos", "Agencias de Marketing", "Consultorías", "Seguros", "Traducciones"],
-            "🐾 MASCOTAS": ["Veterinarias", "Peluquería Canina", "Tiendas de Mascotas", "Entrenadores de Perros", "Hoteles Caninos"],
-            "🏗️ CONSTRUCCIÓN & INDUSTRIA": ["Ferreterías", "Materiales de Construcción", "Empresas de Limpieza", "Instaladores de Aire Acondicionado", "Sistemas de Seguridad", "Paneles Solares"],
-            "🎓 EDUCACIÓN": ["Academias de Idiomas", "Jardines Infantiles", "Colegios Privados", "Escuelas de Conducción", "Centros de Tutorías", "Escuelas de Baile", "Academias de Música"],
-            "👗 MODA & COMERCIO": ["Tiendas de Ropa", "Zapaterías", "Joyarías", "Floristerías", "Ópticas", "Jugueterías", "Regalos/Variedades"],
-            "💻 TECNOLOGÍA": ["Reparación de Celulares", "Soporte Técnico PC", "Venta de Electrónica", "Desarrollo de Software", "Diseño Gráfico"],
-            "🎉 EVENTOS & OCIO": ["Salones de Eventos", "Fotógrafos", "DJ y Sonido", "Agencias de Viajes", "Hoteles/Hostales", "Discotecas", "Bowling/Bolos"],
-            "👔 SERVICIOS PERSONALES": ["Lavanderías/Tintorerías", "Sastrerías", "Mudanzas", "Funerales/Pompas", "Sistemas de Mensajería"]
+            "🏥 SALUD & BIENESTAR": ["Odontólogos", "Psicólogos", "Fisioterapeutas", "Ópticas", "Ginecólogos", "Dermatólogos", "Cardiólogos", "Pediatras", "Centros de Estética", "Nutricionistas", "Podólogos", "Farmacias", "Laboratorios Clínicos"],
+            "🍽️ GASTRONOMÍA": ["Restaurantes", "Cafeterías", "Pizzerías", "Hamburgueserías", "Panaderías/Pastelerías", "Bares/Pubs", "Sushi", "Comida Mexicana", "Comida Vegana", "Catering", "Heladerías", "Asaderos de Pollo", "Licorerías"],
+            "🚗 AUTOMOTRIZ": ["Talleres Mecánicos", "Concesionarios (Venta)", "Lavado de Autos (Spa)", "Venta de Repuestos", "Llantas/Neumáticos", "Alquiler de Vehículos", "Centros de Diagnóstico (CDA)", "Tapicería Automotriz", "Grúas/Asistencia"],
+            "🏠 INMOBILIARIA & CONSTRUCCIÓN": ["Inmobiliarias", "Reformas Integrales", "Pintores", "Cerrajeros", "Electricistas", "Fontaneros/Plomeros", "Carpinterías", "Vidrierías", "Mueblerías", "Decoración de Interiores", "Arquitectos", "Constructoras"],
+            "💄 BELLEZA & CUIDADO": ["Peluquerías", "Barberías", "Spas", "Centros de Uñas (Nails)", "Estética Facial", "Tatuajes (Tattoo Shops)", "Gimnasios", "Crossfit", "Yoga/Pilates", "Escuelas de Baile"],
+            "⚖️ LEGAL & FINANCIERO": ["Abogados", "Contadores/Contables", "Notarías", "Asesores Fiscales", "Agencias de Seguros", "Casas de Cambio", "Consultoría Empresarial"],
+            "🐾 MASCOTAS": ["Veterinarias", "Peluquería Canina", "Tiendas de Mascotas", "Entrenadores", "Hoteles Caninos", "Cementerios de Mascotas"],
+            "🏗️ INDUSTRIAL & TÉCNICO": ["Ferreterías", "Materiales de Construcción", "Empresas de Limpieza", "Aire Acondicionado", "Sistemas de Seguridad", "Paneles Solares", "Control de Plagas", "Mantenimiento Industrial"],
+            "🎓 EDUCACIÓN & CULTURA": ["Academias de Idiomas", "Jardines Infantiles", "Colegios Privados", "Escuelas de Conducción", "Centros de Tutorías", "Academias de Música", "Librerías", "Museos/Galerías"],
+            "👗 MODA & RETAIL": ["Tiendas de Ropa", "Zapaterías", "Joyarías", "Floristerías", "Jugueterías", "Regalos/Variedades", "Centros Comerciales", "Supermercados"],
+            "💻 TECNOLOGÍA & DIGITAL": ["Reparación de Celulares", "Soporte Técnico PC", "Venta de Electrónica", "Agencias de Marketing Digital", "Desarrollo de Software", "Diseño Gráfico", "Instalación de Cámaras/CCTV"],
+            "🎉 EVENTOS & TURISMO": ["Salones de Eventos", "Fotógrafos", "DJ y Sonido", "Agencias de Viajes", "Hoteles/Hostales", "Discotecas", "Bowling/Bolos", "Parques de Diversiones"],
+            "👔 LOGÍSTICA & SERVICIOS": ["Mensajería/Currier", "Mudanzas", "Lavanderías", "Sastrerías", "Funerales", "Seguridad Privada", "Alquiler de Equipos"],
+            "🌱 ENERGÍA & AMBIENTE": ["Instalaciones Eléctricas", "Gestión de Residuos", "Viveros/Paisajismo", "Tratamiento de Agua"]
         }
         cat_nicho = st.selectbox("CATEGORÍA", list(NICHOS_DICT.keys()))
         sub_nicho = st.selectbox("NICHO ESPECÍFICO", NICHOS_DICT[cat_nicho])
@@ -309,8 +327,12 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
 
         found = 0
         audited = 0
-        processed_names = set()
-        scroll_attempts = 0
+        
+        # Cargar nombres ya existentes para evitar re-auditar
+        conn = sqlite3.connect('leads.db')
+        cursor = conn.execute("SELECT nombre FROM leads")
+        processed_names = {row[0] for row in cursor.fetchall()}
+        conn.close()
         
         while (infinito or found < max_results) and not st.session_state.get('stop_requested', False):
             items = await page.query_selector_all("a.hfpxzc")
@@ -397,6 +419,7 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
         st.error(f"❌ Error crítico: {str(e)[:100]}")
     finally:
         await page.close()
+        return found
 
 async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito):
     st.session_state.stop_requested = False
@@ -405,18 +428,45 @@ async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito):
         context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         
         total_barrios = len(barrios_list)
+        leads_sesion = 0
+        
         for i, barrio in enumerate(barrios_list):
             if st.session_state.get('stop_requested', False):
+                st.warning(f"🛑 Extracción detenida por el usuario. Se procesaron {i} de {total_barrios} zonas.")
                 break
-                
-            st.toast(f"📍 Procesando {barrio} ({i+1}/{total_barrios})")
-            query = f"{n} en {barrio}, {city_base}, {p}"
-            await scrape_zone(context, query, max_r, city_base, p, n, infinito)
+            
+            # OPTIMIZACIÓN DE TÉRMINOS PARA BÚSQUEDA TOTAL
+            if n == "Todos los Negocios (General)":
+                search_nicho = "negocios"
+            elif n == "Establecimientos Comerciales":
+                search_nicho = "establecimientos"
+            elif n == "Empresas y Servicios":
+                search_nicho = "servicios"
+            else:
+                search_nicho = n
+
+            # CONSTRUCCIÓN NATURAL DE LA CONSULTA
+            if barrio:
+                query = f"{search_nicho} en {barrio}, {city_base}, {p}"
+            else:
+                query = f"{search_nicho} en {city_base}, {p}"
+
+            st.toast(f"📍 Iniciando: {query}")
+            
+            # Ejecutar y capturar resultados de esta zona
+            encontrados_zona = await scrape_zone(context, query, max_r, city_base, p, n, infinito)
+            leads_sesion += encontrados_zona
+            
+            if encontrados_zona > 0:
+                st.toast(f"✅ ¡Zona completada! +{encontrados_zona} leads", icon="🔥")
             
         await browser.close()
-    st.success("🏁 ¡Tarea masiva completada!")
+        
+        # Guardar en memoria de sesión persistente
+        st.session_state.last_summary = {'leads': leads_sesion}
 
 if start:
+    st.session_state.last_summary = None # Limpiar resumen anterior
     asyncio.run(main_loop(nicho, ciudad_base, pais, barrios, max_res_per_zone, ver_nav, modo_infinito))
     st.rerun()
 
