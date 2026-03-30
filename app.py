@@ -335,30 +335,43 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
         conn.close()
         
         while (infinito or found < max_results) and not st.session_state.get('stop_requested', False):
+            # Intentar pulsar "Buscar en esta zona" si aparece para expandir resultados
+            try:
+                search_area_btn = await page.query_selector('button:has-text("Buscar en esta zona"), button:has-text("Search this area")')
+                if search_area_btn:
+                    await search_area_btn.click()
+                    await asyncio.sleep(2)
+            except: pass
+
             items = await page.query_selector_all("a.hfpxzc")
             if not items: 
-                log_area.write("⚠️ No se encontraron resultados en el mapa.")
-                break
+                log_area.write("⚠️ No se encontraron resultados iniciales. Reintentando...")
+                await asyncio.sleep(3)
+                continue
             
-            # Si ya procesamos todos los elementos visibles, hacemos scroll
+            # Si ya procesamos todos los elementos visibles, hacemos scroll profundo
             if audited >= len(items):
                 feed = await page.query_selector("div[role='feed']")
                 if feed:
-                    log_area.write("🔄 Cargando más resultados...")
-                    await feed.evaluate("el => el.scrollBy(0, 3000)")
-                    await asyncio.sleep(3)
+                    log_area.write("🔄 Scroll profundo: Cargando más resultados...")
+                    # Scroll por etapas para engañar al algoritmo de Google
+                    for _ in range(3):
+                        await feed.evaluate("el => el.scrollBy(0, 1500)")
+                        await asyncio.sleep(1)
+                    
+                    await asyncio.sleep(2) # Espera final de carga
                     new_items = await page.query_selector_all("a.hfpxzc")
+                    
                     if len(new_items) == len(items):
                         scroll_attempts += 1
-                        if scroll_attempts > 3: # Intentar 3 veces antes de rendirse
-                            log_area.write("🏁 Fin de los resultados disponibles en esta zona.")
+                        if scroll_attempts > 5: # Más intentos para zonas difíciles
+                            log_area.write("🏁 Se ha alcanzado el límite de resultados de Google para esta zona.")
                             break
                         continue
                     else:
-                        scroll_attempts = 0 # Reiniciar si cargó nuevos
+                        scroll_attempts = 0
                         continue
-                else:
-                    break
+                else: break
 
             # Procesar el siguiente item por índice
             item = items[audited]
