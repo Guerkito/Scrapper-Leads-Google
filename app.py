@@ -49,104 +49,224 @@ def save_lead(lead):
 init_db()
 
 # --- INTERFACE ---
-st.set_page_config(page_title="Lead Gen Pro v10", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="Lead Gen Pro | Command Center", layout="wide", page_icon="🟢")
 
-# --- CUSTOM CSS ---
+# --- CYBER-PRO CSS ---
 st.markdown("""
     <style>
-    /* Estilo general */
-    .main { background-color: #f8f9fb; }
-    .stApp { color: #1e1e1e; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+
+    /* Fondo Principal y Tipografía */
+    .stApp {
+        background-color: #0a0a0a;
+        font-family: 'Inter', sans-serif;
+        color: #ffffff;
+    }
+
+    /* Ocultar elementos de Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Contenedor Bento Box */
+    .bento-card {
+        background: #161616;
+        border: 1px solid #252525;
+        border-radius: 24px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
     
-    # /* Tarjetas de Métricas */
-    div[data-testid="stMetric"] {
-        background-color: #ffffff;
-        border-radius: 12px;
+    .bento-card:hover {
+        border-color: #39FF14;
+        box-shadow: 0 0 20px rgba(57, 255, 20, 0.1);
+        transform: translateY(-2px);
+    }
+
+    /* Acentos Verde Neón */
+    .neon-text {
+        color: #39FF14;
+        text-shadow: 0 0 8px rgba(57, 255, 20, 0.3); /* Glow suavizado y elegante */
+        font-weight: 800;
+    }
+
+    /* Sidebar Título */
+    .sidebar-title {
+        color: #39FF14;
+        font-size: 1.5em;
+        font-weight: 800;
+        text-align: center;
+        letter-spacing: 3px;
+        margin-bottom: 20px;
+        text-transform: uppercase;
+    }
+
+    /* Expanders Sidebar - Dark Mode Premium (Fuerza Bruta) */
+    [data-testid="stExpander"], [data-testid="stExpander"] details {
+        background-color: #161616 !important;
+        border: 1px solid #252525 !important;
+        border-radius: 15px !important;
+        margin-bottom: 10px !important;
+    }
+
+    /* Eliminar fondos blancos en hover, focus y active */
+    [data-testid="stExpander"] details summary,
+    [data-testid="stExpander"] details summary:hover,
+    [data-testid="stExpander"] details summary:focus,
+    [data-testid="stExpander"] details summary:active {
+        background-color: transparent !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+    }
+    
+    /* Cambiar color de la flecha (chevron) a Verde Neón */
+    [data-testid="stExpander"] details summary svg {
+        fill: #39FF14 !important;
+        filter: drop-shadow(0 0 5px rgba(57, 255, 20, 0.5));
+    }
+
+    /* Fondo oscuro para el contenido interno */
+    [data-testid="stExpander"] details [data-testid="stExpanderDetails"] {
+        background-color: transparent !important;
+        padding-top: 10px !important;
+    }
+
+    /* Info Box Central - Estilo Terminal */
+    div[data-testid="stNotification"] {
+        background-color: #111111 !important;
+        color: #39FF14 !important;
+        border: 1px solid #39FF14 !important;
+        border-radius: 15px !important;
         padding: 20px !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        border: 1px solid #eef0f5;
-        transition: transform 0.3s ease;
-    }
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-5px);
-        border-color: #007bff;
     }
     
-    # /* Botones */
+    div[data-testid="stNotification"] svg {
+        fill: #39FF14 !important;
+    }
+
+    /* Botones Cyberpunk */
     .stButton>button {
-        width: 100%;
-        border-radius: 8px;
-        height: 3em;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    .stButton>button[kind="primary"] {
-        background-color: #007bff;
-        border: none;
-    }
-    
-    # /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-right: 1px solid #eef0f5;
-    }
-    
-    # /* Títulos */
-    h1 { color: #1e293b; font-weight: 800; letter-spacing: -1px; }
-    h3 { color: #334155; }
-    
-    # /* Contenedores */
-    .stExpander {
+        background: #111111 !important;
+        color: #39FF14 !important;
+        border: 1px solid #39FF14 !important;
         border-radius: 10px !important;
-        border: 1px solid #eef0f5 !important;
-        background-color: #ffffff !important;
+        font-weight: 700 !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .stButton>button:hover {
+        background: #39FF14 !important;
+        color: #000000 !important;
+        box-shadow: 0 0 15px rgba(57, 255, 20, 0.4) !important;
+    }
+
+    /* Sidebar Estilizada */
+    section[data-testid="stSidebar"] {
+        background-color: #0f0f0f !important;
+        border-right: 1px solid #252525;
+    }
+
+    /* Métricas */
+    div[data-testid="stMetric"] {
+        background: #161616;
+        border-radius: 20px;
+        padding: 15px !important;
+        border: 1px solid #252525;
+    }
+
+    div[data-testid="stMetricValue"] {
+        color: #39FF14 !important;
+        font-weight: 800;
+    }
+
+    /* Resplandores Radiales de Fondo */
+    .glow-bg {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle at 10% 10%, rgba(57, 255, 20, 0.05) 0%, transparent 40%),
+                    radial-gradient(circle at 90% 90%, rgba(57, 255, 20, 0.05) 0%, transparent 40%);
+        pointer-events: none;
+        z-index: -1;
+    }
+    
+    /* Input Fields */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div {
+        background-color: #1a1a1a !important;
+        color: white !important;
+        border: 1px solid #333 !important;
+        border-radius: 10px !important;
     }
     </style>
+    <div class="glow-bg"></div>
 """, unsafe_allow_html=True)
 
-st.title("⚡ Lead Gen Pro")
-st.markdown("<p style='font-size: 1.2em; color: #64748b;'>Herramienta de prospección inteligente para agencias de alto rendimiento</p>", unsafe_allow_html=True)
+# --- HEADER SECTION ---
+col_head1, col_head2 = st.columns([0.8, 0.2])
+with col_head1:
+    st.markdown("<h1 style='font-size: 3.5em; margin-bottom:0;'>LEAD GEN <span class='neon-text'>PRO</span></h1>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #666; font-size: 1.1em; margin-top:-5px;'>INTELIGENCIA GEOGRÁFICA DE ALTA PRECISIÓN</p>", unsafe_allow_html=True)
+with col_head2:
+    st.markdown("<div style='text-align:right; margin-top:20px;'><span style='background:#111; padding:8px 15px; border-radius:50px; border:1px solid #333; color:#555; font-size:0.8em; font-weight:bold;'>STABLE BUILD v10.1</span></div>", unsafe_allow_html=True)
+
+st.divider()
 
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3063/3063822.png", width=80)
-    st.header("⚙️ Configuración")
+    st.markdown("<div class='sidebar-title'>CENTRAL COMMAND</div>", unsafe_allow_html=True)
+    st.divider()
     
-    with st.expander("🌍 Ubicación", expanded=True):
-        modo_geo = st.radio("Método:", ["📍 Lista", "🌍 Manual"])
-        if modo_geo == "📍 Lista":
+    with st.expander("🌐 GEOLOCALIZACIÓN", expanded=True):
+        modo_geo = st.radio("SISTEMA:", ["📍 LISTA DE PRECISIÓN", "🌍 MANUAL GLOBAL"])
+        if modo_geo == "📍 LISTA DE PRECISIÓN":
             paises_disponibles = sorted(list(GEO_DATA.keys()))
-            pais = st.selectbox("País", paises_disponibles)
+            pais = st.selectbox("PAÍS", paises_disponibles)
+            
             deptos = sorted(list(GEO_DATA[pais].keys()))
-            depto = st.selectbox("Estado/Depto", deptos)
+            depto = st.selectbox("ESTADO / PROVINCIA", deptos)
+            
             ciudades_sug = sorted(GEO_DATA[pais][depto])
-            ciudad_sel = st.selectbox("Ciudad", ["Otra..."] + ciudades_sug)
-            ciudad_base = st.text_input("Manual:", "Bogotá") if ciudad_sel == "Otra..." else ciudad_sel
+            ciudad_sel = st.selectbox("CIUDAD SUGERIDA", ["OTRA CIUDAD (MANUAL)..."] + ciudades_sug)
+            
+            if ciudad_sel == "OTRA CIUDAD (MANUAL)...":
+                # Evitar sugerir Bogotá por defecto fuera de Colombia
+                ciudad_base = st.text_input("ESPECIFICAR CIUDAD:", value=f"Ciudad en {depto}")
+            else:
+                ciudad_base = ciudad_sel
         else:
-            pais = st.text_input("País:", "España")
-            ciudad_base = st.text_input("Ciudad:", "Madrid")
+            pais = st.text_input("PAÍS:", "España")
+            ciudad_base = st.text_input("CIUDAD:", "Madrid")
     
-    with st.expander("🎯 Nicho", expanded=True):
+    with st.expander("🎯 NICHO Y SECTOR", expanded=True):
         NICHOS_DICT = {
-            "🏥 Salud": ["Odontólogos", "Psicólogos", "Fisioterapeutas", "Ópticas", "Centros Médicos"],
-            "🍽️ Gastronomía": ["Restaurantes", "Cafeterías", "Pizzerías", "Bares", "Sushi"],
-            "🚗 Motor": ["Talleres Mecánicos", "Concesionarios", "Lavado de Autos"],
-            "🏠 Hogar": ["Inmobiliarias", "Reformas", "Pintores", "Electricistas"],
-            "💄 Belleza": ["Peluquerías", "Barberías", "Spas", "Estética"],
-            "⚖️ Profesional": ["Abogados", "Contadores", "Arquitectos", "Marketing"],
-            "🐾 Mascotas": ["Veterinarias", "Peluquería Canina"],
-            "✨ Otros": ["Floristerías", "Joyarías", "Mueblerías"]
+            "🌎 TODO EL MERCADO": ["Todos los Negocios (General)", "Establecimientos Comerciales", "Empresas y Servicios"],
+            "🏥 SALUD & BIENESTAR": ["Odontólogos", "Psicólogos", "Fisioterapeutas", "Ópticas", "Centros Médicos", "Ginecólogos", "Dermatólogos", "Cardiólogos", "Centros de Estética", "Nutricionistas", "Podólogos"],
+            "🍽️ GASTRONOMÍA": ["Restaurantes", "Cafeterías", "Pizzerías", "Hamburgueserías", "Panaderías", "Bares", "Sushi", "Catering", "Heladerías", "Asaderos de Pollo"],
+            "🚗 AUTOMOTRIZ": ["Talleres Mecánicos", "Concesionarios", "Lavado de Autos (Spa)", "Venta de Repuestos", "Llantas/Neumáticos", "Alquiler de Vehículos", "Centros de Diagnóstico (CDA)"],
+            "🏠 HOGAR & REAL ESTATE": ["Inmobiliarias", "Reformas Integrales", "Pintores", "Cerrajeros", "Electricistas", "Fontaneros/Plomeros", "Carpinterías", "Vidrierías", "Mueblerías", "Decoración"],
+            "💄 BELLEZA": ["Peluquerías", "Barberías", "Spas", "Centros de Uñas (Nails)", "Estética Facial", "Tatuajes (Tattoo Shops)", "Gimnasios/Crossfit", "Centros de Yoga"],
+            "⚖️ LEGAL & PROFESIONAL": ["Abogados", "Contadores/Contables", "Notarías", "Arquitectos", "Agencias de Marketing", "Consultorías", "Seguros", "Traducciones"],
+            "🐾 MASCOTAS": ["Veterinarias", "Peluquería Canina", "Tiendas de Mascotas", "Entrenadores de Perros", "Hoteles Caninos"],
+            "🏗️ CONSTRUCCIÓN & INDUSTRIA": ["Ferreterías", "Materiales de Construcción", "Empresas de Limpieza", "Instaladores de Aire Acondicionado", "Sistemas de Seguridad", "Paneles Solares"],
+            "🎓 EDUCACIÓN": ["Academias de Idiomas", "Jardines Infantiles", "Colegios Privados", "Escuelas de Conducción", "Centros de Tutorías", "Escuelas de Baile", "Academias de Música"],
+            "👗 MODA & COMERCIO": ["Tiendas de Ropa", "Zapaterías", "Joyarías", "Floristerías", "Ópticas", "Jugueterías", "Regalos/Variedades"],
+            "💻 TECNOLOGÍA": ["Reparación de Celulares", "Soporte Técnico PC", "Venta de Electrónica", "Desarrollo de Software", "Diseño Gráfico"],
+            "🎉 EVENTOS & OCIO": ["Salones de Eventos", "Fotógrafos", "DJ y Sonido", "Agencias de Viajes", "Hoteles/Hostales", "Discotecas", "Bowling/Bolos"],
+            "👔 SERVICIOS PERSONALES": ["Lavanderías/Tintorerías", "Sastrerías", "Mudanzas", "Funerales/Pompas", "Sistemas de Mensajería"]
         }
-        cat_nicho = st.selectbox("Categoría", list(NICHOS_DICT.keys()))
-        sub_nicho = st.selectbox("Especialidad", NICHOS_DICT[cat_nicho])
-        nicho = st.text_input("Nicho Manual:") if st.checkbox("✍️ Personalizar") else sub_nicho
+        cat_nicho = st.selectbox("CATEGORÍA", list(NICHOS_DICT.keys()))
+        sub_nicho = st.selectbox("NICHO ESPECÍFICO", NICHOS_DICT[cat_nicho])
+        nicho = st.text_input("NICHO CUSTOM:") if st.checkbox("✍️ MODO MANUAL") else sub_nicho
 
-    with st.expander("📍 Zona y Límites", expanded=True):
-        tipo_zona = st.radio("Cobertura:", ["Toda la ciudad", "Sur", "Norte", "Este", "Oeste", "Personalizada"])
-        barrios = st.text_area("Barrios (uno por línea):", "Centro").split("\n") if tipo_zona == "Personalizada" else ([""] if tipo_zona == "Toda la ciudad" else [tipo_zona])
+    with st.expander("⚡ PARÁMETROS DE BÚSQUEDA", expanded=True):
+        tipo_zona = st.radio("COBERTURA RADIAL:", ["📍 TODA LA CIUDAD", "⬆️ NORTE", "⬇️ SUR", "⬅️ ESTE", "➡️ OESTE", "🧩 BARRIOS ESPECÍFICOS"])
+        barrios = st.text_area("LISTA DE BARRIOS:", "Zona Centro").split("\n") if tipo_zona == "🧩 BARRIOS ESPECÍFICOS" else ([""] if tipo_zona == "📍 TODA LA CIUDAD" else [tipo_zona])
         
-        modo_infinito = st.toggle("♾️ Modo Infinito", value=False)
-        max_res_per_zone = st.number_input("Máx. resultados", 5, 1000, 20)
-        ver_nav = st.checkbox("👁️ Ver navegador", value=False)
+        modo_infinito = st.toggle("♾️ EXTRACCIÓN ILIMITADA", value=False)
+        max_res_per_zone = st.number_input("CAPACIDAD POR ZONA", 5, 5000, 50)
+        ver_nav = st.checkbox("👁️ MODO OBSERVADOR (VER BROWSER)", value=False)
     
     st.divider()
     col_start, col_stop = st.columns(2)
