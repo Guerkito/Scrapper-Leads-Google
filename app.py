@@ -55,22 +55,30 @@ st.title("⚡ Lead Gen Pro - Dashboard en Vivo v10")
 with st.sidebar:
     st.header("⚙️ Configuración")
     
-    # 1. País
-    paises_disponibles = sorted(list(GEO_DATA.keys()))
-    pais = st.selectbox("País", paises_disponibles)
+    # MODO UNIVERSAL
+    modo_geo = st.radio("Método de ubicación:", ["📍 Seleccionar de lista", "🌍 Escritura Manual (Todo el mundo)"])
     
-    # 2. Departamento / Estado
-    deptos = sorted(list(GEO_DATA[pais].keys()))
-    depto = st.selectbox("Departamento / Estado", deptos)
-    
-    # 3. Ciudad Base (Sugerencias)
-    ciudades_sug = sorted(GEO_DATA[pais][depto])
-    ciudad_sel = st.selectbox("Ciudad Principal (Sugerida)", ["Otra..."] + ciudades_sug)
-    
-    if ciudad_sel == "Otra...":
-        ciudad_base = st.text_input("Escribe la Ciudad manualmente:")
+    if modo_geo == "📍 Seleccionar de lista":
+        # 1. País
+        paises_disponibles = sorted(list(GEO_DATA.keys()))
+        pais = st.selectbox("País", paises_disponibles)
+        
+        # 2. Departamento / Estado
+        deptos = sorted(list(GEO_DATA[pais].keys()))
+        depto = st.selectbox("Departamento / Estado", deptos)
+        
+        # 3. Ciudad Base (Sugerencias)
+        ciudades_sug = sorted(GEO_DATA[pais][depto])
+        ciudad_sel = st.selectbox("Ciudad Principal (Sugerida)", ["Otra..."] + ciudades_sug)
+        
+        if ciudad_sel == "Otra...":
+            ciudad_base = st.text_input("Escribe la Ciudad manualmente:")
+        else:
+            ciudad_base = ciudad_sel
     else:
-        ciudad_base = ciudad_sel
+        # BÚSQUEDA UNIVERSAL TOTAL
+        pais = st.text_input("Escribe el País:", "Emiratos Árabes")
+        ciudad_base = st.text_input("Escribe la Ciudad (Cualquiera del mundo):", "Dubái")
     
     # 4. Nichos y Subnichos
     st.subheader("🎯 Nichos y Especialidades")

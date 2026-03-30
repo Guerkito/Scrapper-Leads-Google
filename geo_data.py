@@ -168,5 +168,60 @@ GEO_DATA = {
     "Portugal": {
         "Lisboa": ["Lisboa"],
         "Oporto": ["Oporto"]
+    },
+    "Brasil": {
+        "São Paulo": ["São Paulo", "Guarulhos", "Campinas", "São Bernardo do Campo"],
+        "Rio de Janeiro": ["Rio de Janeiro", "São Gonçalo", "Duque de Caxias"],
+        "Minas Gerais": ["Belo Horizonte", "Uberlândia"],
+        "Bahia": ["Salvador"],
+        "Paraná": ["Curitiba"],
+        "Rio Grande do Sul": ["Porto Alegre"]
+    },
+    "Canadá": {
+        "Ontario": ["Toronto", "Ottawa", "Mississauga", "Hamilton"],
+        "Quebec": ["Montreal", "Quebec City", "Laval"],
+        "British Columbia": ["Vancouver", "Surrey", "Burnaby"],
+        "Alberta": ["Calgary", "Edmonton"]
+    },
+    "Reino Unido": {
+        "England": ["Londres", "Birmingham", "Manchester", "Liverpool", "Leeds", "Sheffield", "Bristol"],
+        "Scotland": ["Glasgow", "Edimburgo"],
+        "Wales": ["Cardiff"],
+        "Northern Ireland": ["Belfast"]
+    },
+    "Alemania": {
+        "Berlin": ["Berlín"],
+        "Baviera": ["Múnich", "Núremberg"],
+        "Baden-Wurtemberg": ["Stuttgart", "Karlsruhe"],
+        "Renania del Norte-Westfalia": ["Colonia", "Düsseldorf", "Dortmund", "Essen"]
+    },
+    "Australia": {
+        "New South Wales": ["Sídney"],
+        "Victoria": ["Melbourne"],
+        "Queensland": ["Brisbane"],
+        "Western Australia": ["Perth"]
+    },
+    "Bolivia": {
+        "Santa Cruz": ["Santa Cruz de la Sierra"],
+        "La Paz": ["La Paz", "El Alto"],
+        "Cochabamba": ["Cochabamba"]
+    },
+    "República Dominicana": {
+        "Distrito Nacional": ["Santo Domingo"],
+        "Santiago": ["Santiago de los Caballeros"]
+    },
+    "Guatemala": {
+        "Guatemala": ["Ciudad de Guatemala", "Mixco", "Villa Nueva"]
+    },
+    "Honduras": {
+        "Francisco Morazán": ["Tegucigalpa"],
+        "Cortés": ["San Pedro Sula"]
+    },
+    "El Salvador": {
+        "San Salvador": ["San Salvador", "Soyapango"]
+    },
+    "Costa Rica": {
+        "San José": ["San José"],
+        "Alajuela": ["Alajuela"]
     }
 }
