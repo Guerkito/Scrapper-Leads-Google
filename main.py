@@ -83,13 +83,24 @@ async def scrape_google_maps(search_query, total_results=50):
                     phone_element = await page.query_selector('button[data-item-id^="phone:tel:"]')
                     phone = await phone_element.inner_text() if phone_element else "N/A"
 
+                    # Extraer y formatear Rating (Ej: "4.5 / 5")
+                    rating_el = await page.query_selector("span[aria-label*='estrellas']")
+                    rating_raw = await rating_el.get_attribute("aria-label") if rating_el else "N/A"
+                    if rating_raw != "N/A":
+                        try:
+                            rating_num = rating_raw.split()[0].replace(",", ".")
+                            rating = f"{rating_num} / 5"
+                        except: rating = "N/A"
+                    else: rating = "N/A"
+
                     results.append({
                         "Nombre": name,
                         "Dirección": address,
                         "Teléfono": phone,
+                        "Rating": rating,
                         "Sitio Web": "Sin sitio web"
                     })
-                    print(f"[{len(results)}] Encontrado: {name} (Sin sitio web)")
+                    print(f"[{len(results)}] Encontrado: {name} (Rating: {rating})")
                 else:
                     print(f"Saltado: {name} (Tiene sitio web)")
 

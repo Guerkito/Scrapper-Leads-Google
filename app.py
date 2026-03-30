@@ -196,8 +196,17 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val):
                 if not web_btn:
                     phone_el = await page.query_selector('button[data-item-id^="phone:tel:"]')
                     phone = await phone_el.inner_text() if phone_el else "N/A"
+                    
+                    # Extraer y formatear Rating (Ej: "4,5 estrellas" -> "4.5 / 5")
                     rating_el = await page.query_selector("span[aria-label*='estrellas']")
-                    rating = await rating_el.get_attribute("aria-label") if rating_el else "N/A"
+                    rating_raw = await rating_el.get_attribute("aria-label") if rating_el else "N/A"
+                    if rating_raw != "N/A":
+                        try:
+                            # Extraer solo el número (ej: 4,5 o 4.5)
+                            rating_num = rating_raw.split()[0].replace(",", ".")
+                            rating = f"{rating_num} / 5"
+                        except: rating = "N/A"
+                    else: rating = "N/A"
                     
                     save_lead({"Nombre": name, "Teléfono": phone, "Rating": rating, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val})
                     found += 1
