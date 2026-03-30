@@ -49,85 +49,109 @@ def save_lead(lead):
 init_db()
 
 # --- INTERFACE ---
-st.set_page_config(page_title="Lead Gen Pro v10", layout="wide")
-st.title("⚡ Lead Gen Pro - Dashboard en Vivo v10")
+st.set_page_config(page_title="Lead Gen Pro v10", layout="wide", page_icon="⚡")
 
-with st.sidebar:
-    st.header("⚙️ Configuración")
+# --- CUSTOM CSS ---
+st.markdown("""
+    <style>
+    /* Estilo general */
+    .main { background-color: #f8f9fb; }
+    .stApp { color: #1e1e1e; }
     
-    # MODO UNIVERSAL
-    modo_geo = st.radio("Método de ubicación:", ["📍 Seleccionar de lista", "🌍 Escritura Manual (Todo el mundo)"])
-    
-    if modo_geo == "📍 Seleccionar de lista":
-        # 1. País
-        paises_disponibles = sorted(list(GEO_DATA.keys()))
-        pais = st.selectbox("País", paises_disponibles)
-        
-        # 2. Departamento / Estado
-        deptos = sorted(list(GEO_DATA[pais].keys()))
-        depto = st.selectbox("Departamento / Estado", deptos)
-        
-        # 3. Ciudad Base (Sugerencias)
-        ciudades_sug = sorted(GEO_DATA[pais][depto])
-        ciudad_sel = st.selectbox("Ciudad Principal (Sugerida)", ["Otra..."] + ciudades_sug)
-        
-        if ciudad_sel == "Otra...":
-            ciudad_base = st.text_input("Escribe la Ciudad manualmente:")
-        else:
-            ciudad_base = ciudad_sel
-    else:
-        # BÚSQUEDA UNIVERSAL TOTAL
-        pais = st.text_input("Escribe el País:", "Emiratos Árabes")
-        ciudad_base = st.text_input("Escribe la Ciudad (Cualquiera del mundo):", "Dubái")
-    
-    # 4. Nichos y Subnichos
-    st.subheader("🎯 Nichos y Especialidades")
-    NICHOS_DICT = {
-        "🏥 Salud": ["Odontólogos", "Psicólogos", "Fisioterapeutas", "Ópticas", "Ginecólogos", "Dermatólogos", "Centros Médicos"],
-        "🍽️ Gastronomía": ["Restaurantes", "Cafeterías", "Pizzerías", "Hamburgueserías", "Panaderías", "Bares", "Sushi"],
-        "🚗 Motor": ["Talleres Mecánicos", "Concesionarios", "Lavado de Autos", "Repuestos de Vehículos", "Llantas/Neumáticos"],
-        "🏠 Hogar e Inmuebles": ["Inmobiliarias", "Reformas Integrales", "Pintores", "Cerrajeros", "Electricistas", "Fontaneros/Plomeros"],
-        "💄 Belleza y Estética": ["Peluquerías", "Barberías", "Centros de Uñas (Nails)", "Spas", "Centros de Estética"],
-        "⚖️ Servicios Profesionales": ["Abogados", "Contadores/Contables", "Notarías", "Arquitectos", "Agencias de Marketing"],
-        "🐾 Mascotas": ["Veterinarias", "Peluquería Canina", "Tiendas de Mascotas", "Entrenadores de Perros"],
-        "🏗️ Construcción": ["Ferreterías", "Materiales de Construcción", "Carpinterías", "Vidrierías"],
-        "🎓 Educación": ["Academias de Idiomas", "Jardines Infantiles", "Escuelas de Conducción", "Gimnasios/Crossfit"],
-        "✨ Otros": ["Floristerías", "Tiendas de Ropa", "Joyarías", "Mueblerías"]
+    # /* Tarjetas de Métricas */
+    div[data-testid="stMetric"] {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 20px !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border: 1px solid #eef0f5;
+        transition: transform 0.3s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-5px);
+        border-color: #007bff;
     }
     
-    cat_nicho = st.selectbox("Categoría de Negocio", list(NICHOS_DICT.keys()))
-    sub_nicho = st.selectbox("Especialidad (Sub-nicho)", NICHOS_DICT[cat_nicho])
+    # /* Botones */
+    .stButton>button {
+        width: 100%;
+        border-radius: 8px;
+        height: 3em;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .stButton>button[kind="primary"] {
+        background-color: #007bff;
+        border: none;
+    }
     
-    # Opción de personalización manual
-    custom_nicho = st.checkbox("✍️ Escribir nicho personalizado manualmente")
-    if custom_nicho:
-        nicho = st.text_input("Escribe el nicho exactamente como quieres buscarlo:")
-    else:
-        nicho = sub_nicho
+    # /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #eef0f5;
+    }
+    
+    # /* Títulos */
+    h1 { color: #1e293b; font-weight: 800; letter-spacing: -1px; }
+    h3 { color: #334155; }
+    
+    # /* Contenedores */
+    .stExpander {
+        border-radius: 10px !important;
+        border: 1px solid #eef0f5 !important;
+        background-color: #ffffff !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("⚡ Lead Gen Pro")
+st.markdown("<p style='font-size: 1.2em; color: #64748b;'>Herramienta de prospección inteligente para agencias de alto rendimiento</p>", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/3063/3063822.png", width=80)
+    st.header("⚙️ Configuración")
+    
+    with st.expander("🌍 Ubicación", expanded=True):
+        modo_geo = st.radio("Método:", ["📍 Lista", "🌍 Manual"])
+        if modo_geo == "📍 Lista":
+            paises_disponibles = sorted(list(GEO_DATA.keys()))
+            pais = st.selectbox("País", paises_disponibles)
+            deptos = sorted(list(GEO_DATA[pais].keys()))
+            depto = st.selectbox("Estado/Depto", deptos)
+            ciudades_sug = sorted(GEO_DATA[pais][depto])
+            ciudad_sel = st.selectbox("Ciudad", ["Otra..."] + ciudades_sug)
+            ciudad_base = st.text_input("Manual:", "Bogotá") if ciudad_sel == "Otra..." else ciudad_sel
+        else:
+            pais = st.text_input("País:", "España")
+            ciudad_base = st.text_input("Ciudad:", "Madrid")
+    
+    with st.expander("🎯 Nicho", expanded=True):
+        NICHOS_DICT = {
+            "🏥 Salud": ["Odontólogos", "Psicólogos", "Fisioterapeutas", "Ópticas", "Centros Médicos"],
+            "🍽️ Gastronomía": ["Restaurantes", "Cafeterías", "Pizzerías", "Bares", "Sushi"],
+            "🚗 Motor": ["Talleres Mecánicos", "Concesionarios", "Lavado de Autos"],
+            "🏠 Hogar": ["Inmobiliarias", "Reformas", "Pintores", "Electricistas"],
+            "💄 Belleza": ["Peluquerías", "Barberías", "Spas", "Estética"],
+            "⚖️ Profesional": ["Abogados", "Contadores", "Arquitectos", "Marketing"],
+            "🐾 Mascotas": ["Veterinarias", "Peluquería Canina"],
+            "✨ Otros": ["Floristerías", "Joyarías", "Mueblerías"]
+        }
+        cat_nicho = st.selectbox("Categoría", list(NICHOS_DICT.keys()))
+        sub_nicho = st.selectbox("Especialidad", NICHOS_DICT[cat_nicho])
+        nicho = st.text_input("Nicho Manual:") if st.checkbox("✍️ Personalizar") else sub_nicho
+
+    with st.expander("📍 Zona y Límites", expanded=True):
+        tipo_zona = st.radio("Cobertura:", ["Toda la ciudad", "Sur", "Norte", "Este", "Oeste", "Personalizada"])
+        barrios = st.text_area("Barrios (uno por línea):", "Centro").split("\n") if tipo_zona == "Personalizada" else ([""] if tipo_zona == "Toda la ciudad" else [tipo_zona])
+        
+        modo_infinito = st.toggle("♾️ Modo Infinito", value=False)
+        max_res_per_zone = st.number_input("Máx. resultados", 5, 1000, 20)
+        ver_nav = st.checkbox("👁️ Ver navegador", value=False)
     
     st.divider()
-    st.subheader("📍 ¿Dónde buscar?")
-    tipo_zona = st.radio("Selecciona cobertura:", ["Toda la ciudad", "Sur", "Norte", "Este", "Oeste", "Zonas Personalizadas"])
-    
-    if tipo_zona == "Zonas Personalizadas":
-        st.caption("Escribe un barrio por línea")
-        barrios_input = st.text_area("Lista de Barrios:", "Zona Centro\nBarrio Alto", height=150)
-        barrios = [b.strip() for b in barrios_input.split("\n") if b.strip()]
-    elif tipo_zona == "Toda la ciudad":
-        barrios = [""] # Búsqueda general
-    else:
-        barrios = [tipo_zona] # El nombre de la zona (Sur, Norte, etc)
-    
-    st.divider()
-    col_inf1, col_inf2 = st.columns(2)
-    with col_inf1: modo_infinito = st.toggle("♾️ Modo Infinito", value=False, help="Ignora el límite y busca hasta que des a PARAR")
-    with col_inf2: max_res_per_zone = st.number_input("Resultados por barrio", 5, 1000, 20)
-    
-    ver_nav = st.checkbox("👁️ Ver navegador", value=False)
-    
-    col1, col2 = st.columns(2)
-    with col1: start = st.button("🚀 INICIAR")
-    with col2: stop = st.button("🛑 PARAR")
+    col_start, col_stop = st.columns(2)
+    with col_start: start = st.button("🚀 INICIAR", type="primary")
+    with col_stop: stop = st.button("🛑 PARAR")
 
 # --- SCRAPER ENGINE ---
 async def scrape_zone(context, query, max_results, city, country, nicho_val, infinito):
