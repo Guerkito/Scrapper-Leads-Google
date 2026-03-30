@@ -16,6 +16,7 @@ def init_db():
         nombre TEXT UNIQUE, 
         telefono TEXT, 
         rating TEXT, 
+        tipo TEXT,
         zona TEXT, 
         ciudad TEXT, 
         pais TEXT, 
@@ -23,7 +24,7 @@ def init_db():
         fecha TEXT)''')
     
     # Asegurar que las columnas nuevas existan (MIGRACIÓN)
-    cols = ["zona", "ciudad", "pais", "nicho", "fecha"]
+    cols = ["tipo", "zona", "ciudad", "pais", "nicho", "fecha"]
     cursor = conn.execute("PRAGMA table_info(leads)")
     existing_cols = [row[1] for row in cursor.fetchall()]
     
@@ -31,7 +32,6 @@ def init_db():
         if col not in existing_cols:
             try:
                 conn.execute(f"ALTER TABLE leads ADD COLUMN {col} TEXT")
-                print(f"Columna '{col}' añadida con éxito.")
             except: pass
             
     conn.commit()
@@ -40,9 +40,9 @@ def init_db():
 def save_lead(lead):
     conn = sqlite3.connect('leads.db')
     try:
-        conn.execute('''INSERT OR IGNORE INTO leads (nombre, telefono, rating, zona, ciudad, pais, nicho, fecha)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)''', 
-            (lead['Nombre'], lead['Teléfono'], lead['Rating'], lead['Zona'], lead['Ciudad'], lead['Pais'], lead['Nicho'], datetime.datetime.now().strftime("%Y-%m-%d")))
+        conn.execute('''INSERT OR IGNORE INTO leads (nombre, telefono, rating, tipo, zona, ciudad, pais, nicho, fecha)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+            (lead['Nombre'], lead['Teléfono'], lead['Rating'], lead['Tipo'], lead['Zona'], lead['Ciudad'], lead['Pais'], lead['Nicho'], datetime.datetime.now().strftime("%Y-%m-%d")))
         conn.commit()
     finally: conn.close()
 
@@ -194,21 +194,24 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val):
                     await asyncio.sleep(0.5)
                 
                 if not web_btn:
+                    # EXTRAER CATEGORÍA / TIPO (Ej: "Clínica dental")
+                    tipo_el = await page.query_selector('button[class="Dener"]')
+                    tipo_txt = await tipo_el.inner_text() if tipo_el else "N/A"
+                    
                     phone_el = await page.query_selector('button[data-item-id^="phone:tel:"]')
                     phone = await phone_el.inner_text() if phone_el else "N/A"
                     
-                    # Extraer y formatear Rating (Ej: "4,5 estrellas" -> "4.5 / 5")
+                    # Extraer y formatear Rating (Ej: "4.5 / 5")
                     rating_el = await page.query_selector("span[aria-label*='estrellas']")
                     rating_raw = await rating_el.get_attribute("aria-label") if rating_el else "N/A"
                     if rating_raw != "N/A":
                         try:
-                            # Extraer solo el número (ej: 4,5 o 4.5)
                             rating_num = rating_raw.split()[0].replace(",", ".")
                             rating = f"{rating_num} / 5"
                         except: rating = "N/A"
                     else: rating = "N/A"
                     
-                    save_lead({"Nombre": name, "Teléfono": phone, "Rating": rating, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val})
+                    save_lead({"Nombre": name, "Teléfono": phone, "Rating": rating, "Tipo": tipo_txt, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val})
                     found += 1
                     
                     # Actualizar Dashboard
