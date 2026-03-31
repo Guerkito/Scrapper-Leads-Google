@@ -587,13 +587,52 @@ if not df.empty:
     with col_s2: st.metric("Nichos Diferentes", len(filtered_df['nicho'].unique()))
     with col_s3: st.metric("Ciudades Cubiertas", len(filtered_df['ciudad'].unique()))
     
-    # --- MAPA TÁCTICO ---
-    map_data = filtered_df.dropna(subset=['lat', 'lng']).copy()
-    if not map_data.empty:
-        st.markdown("#### 🗺️ Mapa Táctico de Prospectos")
-        # Renombrar lng a lon para que Streamlit lo reconozca
-        map_data = map_data.rename(columns={'lat': 'lat', 'lng': 'lon'})
-        st.map(map_data[['lat', 'lon']], size=20, color="#39FF14")
+    # --- MAPA TÁCTICO AVANZADO ---
+    st.markdown("#### 🗺️ Inteligencia Geográfica Táctica")
+    col_map1, col_map2 = st.columns([0.8, 0.2])
+    with col_map2:
+        view_all = st.toggle("🌍 Ver Base Global", value=False, help="Muestra todos los leads de la historia en el mapa")
+    
+    # Preparar datos del mapa
+    if view_all:
+        map_source = df.dropna(subset=['lat', 'lng']).copy()
+    else:
+        map_source = filtered_df.dropna(subset=['lat', 'lng']).copy()
+    
+    if not map_source.empty:
+        import pydeck as pdk
+        
+        # Crear capa de puntos
+        layer = pdk.Layer(
+            "ScatterplotLayer",
+            map_source,
+            get_position=["lng", "lat"],
+            get_color="[57, 255, 20, 160]", # Verde Neón con transparencia
+            get_radius=100,
+            pickable=True,
+            auto_highlight=True,
+        )
+        
+        # Configurar vista inicial centrada en los leads
+        view_state = pdk.ViewState(
+            latitude=map_source["lat"].mean(),
+            longitude=map_source["lng"].mean(),
+            zoom=10,
+            pitch=45,
+        )
+        
+        # Renderizar mapa con Pydeck
+        st.pydeck_chart(pdk.Deck(
+            layers=[layer],
+            initial_view_state=view_state,
+            map_style="mapbox://styles/mapbox/dark-v11",
+            tooltip={
+                "html": "<b>Negocio:</b> {nombre}<br><b>Rating:</b> {rating}<br><b>Reseñas:</b> {reseñas}<br><b>Tel:</b> {telefono}",
+                "style": {"backgroundColor": "#161616", "color": "#39FF14", "border": "1px solid #39FF14", "borderRadius": "10px"}
+            }
+        ))
+    else:
+        st.info("📍 No hay coordenadas disponibles para mostrar en el mapa todavía.")
 
     # --- TABLA Y DESCARGA ---
     # Calcular Lead Score y WhatsApp Link
