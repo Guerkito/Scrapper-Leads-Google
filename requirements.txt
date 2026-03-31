@@ -2,3 +2,6 @@ playwright
 pandas
 beautifulsoup4
 streamlit
+pydeck
+folium
+streamlit-folium
