@@ -16,7 +16,10 @@ def init_db():
         nombre TEXT UNIQUE, 
         telefono TEXT, 
         rating TEXT, 
+        reseñas TEXT,
         tipo TEXT,
+        lat REAL,
+        lng REAL,
         zona TEXT, 
         ciudad TEXT, 
         pais TEXT, 
@@ -24,14 +27,14 @@ def init_db():
         fecha TEXT)''')
     
     # Asegurar que las columnas nuevas existan (MIGRACIÓN)
-    cols = ["tipo", "zona", "ciudad", "pais", "nicho", "fecha"]
+    cols = [("lat", "REAL"), ("lng", "REAL"), ("reseñas", "TEXT"), ("tipo", "TEXT"), ("zona", "TEXT"), ("ciudad", "TEXT"), ("pais", "TEXT"), ("nicho", "TEXT"), ("fecha", "TEXT")]
     cursor = conn.execute("PRAGMA table_info(leads)")
     existing_cols = [row[1] for row in cursor.fetchall()]
     
-    for col in cols:
-        if col not in existing_cols:
+    for col_name, col_type in cols:
+        if col_name not in existing_cols:
             try:
-                conn.execute(f"ALTER TABLE leads ADD COLUMN {col} TEXT")
+                conn.execute(f"ALTER TABLE leads ADD COLUMN {col_name} {col_type}")
             except: pass
             
     conn.commit()
@@ -40,9 +43,9 @@ def init_db():
 def save_lead(lead):
     conn = sqlite3.connect('leads.db')
     try:
-        conn.execute('''INSERT OR IGNORE INTO leads (nombre, telefono, rating, tipo, zona, ciudad, pais, nicho, fecha)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-            (lead['Nombre'], lead['Teléfono'], lead['Rating'], lead['Tipo'], lead['Zona'], lead['Ciudad'], lead['Pais'], lead['Nicho'], datetime.datetime.now().strftime("%Y-%m-%d")))
+        conn.execute('''INSERT OR IGNORE INTO leads (nombre, telefono, rating, reseñas, tipo, lat, lng, zona, ciudad, pais, nicho, fecha)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+            (lead['Nombre'], lead['Teléfono'], lead['Rating'], lead['Reseñas'], lead['Tipo'], lead.get('Lat'), lead.get('Lng'), lead['Zona'], lead['Ciudad'], lead['Pais'], lead['Nicho'], datetime.datetime.now().strftime("%Y-%m-%d")))
         conn.commit()
     finally: conn.close()
 
@@ -399,13 +402,28 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                     # EXTRAER CATEGORÍA / TIPO
                     tipo_el = await page.query_selector('button[class="Dener"]')
                     tipo_txt = await tipo_el.inner_text() if tipo_el else "N/A"
-                    
+
+                    # EXTRAER COORDENADAS (De la URL)
+                    lat, lng = None, None
+                    try:
+                        url = page.url
+                        import re
+                        match = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", url)
+                        if match:
+                            lat, lng = float(match.group(1)), float(match.group(2))
+                    except: pass
+
                     phone_el = await page.query_selector('button[data-item-id^="phone:tel:"]')
+
                     phone = await phone_el.inner_text() if phone_el else "N/A"
                     
-                    # Extraer y formatear Rating
+                    # Extraer Rating y Reseñas
                     rating_el = await page.query_selector("span[aria-label*='estrellas']")
                     rating_raw = await rating_el.get_attribute("aria-label") if rating_el else "N/A"
+                    
+                    reviews_el = await page.query_selector("span[aria-label*='reseñas'], span[aria-label*='opiniones']")
+                    reviews_raw = await reviews_el.get_attribute("aria-label") if reviews_el else "0"
+                    
                     if rating_raw != "N/A":
                         try:
                             rating_num = rating_raw.split()[0].replace(",", ".")
@@ -413,7 +431,10 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                         except: rating = "N/A"
                     else: rating = "N/A"
                     
-                    save_lead({"Nombre": name, "Teléfono": phone, "Rating": rating, "Tipo": tipo_txt, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val})
+                    try: reviews = "".join(filter(str.isdigit, reviews_raw)) or "0"
+                    except: reviews = "0"
+                    
+                    save_lead({"Nombre": name, "Teléfono": phone, "Rating": rating, "Reseñas": reviews, "Tipo": tipo_txt, "Lat": lat, "Lng": lng, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val})
                     found += 1
                     
                     # Actualizar Dashboard
@@ -528,8 +549,47 @@ if not df.empty:
     with col_s2: st.metric("Nichos Diferentes", len(filtered_df['nicho'].unique()))
     with col_s3: st.metric("Ciudades Cubiertas", len(filtered_df['ciudad'].unique()))
     
+    # --- MAPA TÁCTICO ---
+    map_data = filtered_df.dropna(subset=['lat', 'lng'])
+    if not map_data.empty:
+        st.markdown("#### 🗺️ Mapa Táctico de Prospectos")
+        st.map(map_data[['lat', 'lng']], size=20, color="#39FF14")
+
     # --- TABLA Y DESCARGA ---
-    st.dataframe(filtered_df, use_container_width=True)
+    # Calcular Lead Score y WhatsApp Link
+    display_df = filtered_df.copy()
+    
+    def calculate_wa(row):
+        phone = "".join(filter(str.isdigit, str(row['telefono'])))
+        if not phone or len(phone) < 7: return "N/A"
+        msg = f"Hola {row['nombre']}, vi tu negocio en Google Maps y me encantó la puntuación de {row['rating']} que tienes. Noté que no tienes sitio web oficial y me gustaría ayudarte con eso. ¿Te interesaría?"
+        msg_encoded = urllib.parse.quote(msg)
+        return f"https://wa.me/{phone}?text={msg_encoded}"
+
+    def get_status(row):
+        try:
+            r_num = float(row['rating'].split("/")[0])
+            rev_num = int(row['reseñas'])
+            if r_num >= 4.0 and rev_num >= 20: return "🔥 ORO"
+            if r_num >= 3.5: return "✅ Bueno"
+            return "⚪ Frío"
+        except: return "⚪ S/D"
+
+    display_df['Status'] = display_df.apply(get_status, axis=1)
+    display_df['WhatsApp'] = display_df.apply(calculate_wa, axis=1)
+    
+    # Reordenar columnas para que WhatsApp y Status estén al principio
+    cols = ['Status', 'nombre', 'WhatsApp', 'telefono', 'rating', 'reseñas', 'tipo', 'ciudad', 'nicho', 'fecha']
+    display_df = display_df[cols]
+
+    st.dataframe(
+        display_df, 
+        use_container_width=True,
+        column_config={
+            "WhatsApp": st.column_config.LinkColumn("WhatsApp 📲", help="Clic para contactar"),
+            "Status": st.column_config.TextColumn("Calificación 🏆", help="Prioridad del Lead")
+        }
+    )
     
     col_d1, col_d2 = st.columns(2)
     with col_d1:
