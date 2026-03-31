@@ -1,16 +1,31 @@
-# ⚡ Lead Gen Pro - Google Maps Scraper & CRM v10
+# ⚡ Lead Gen Pro - Command Center v10.2
 
-¡Bienvenido al **Lead Gen Pro**! Una herramienta potente y automatizada diseñada para encontrar negocios locales en Google Maps que **no tienen sitio web**, ayudándote a identificar prospectos ideales para servicios de diseño web, marketing digital y SEO.
+¡Bienvenido al **Lead Gen Pro**! La herramienta definitiva de inteligencia comercial diseñada para agencias y freelancers. Este software ha evolucionado: ya no solo busca negocios sin sitio web, sino que es una **plataforma de prospección universal** capaz de extraer, calificar y organizar leads de **cualquier nicho en cualquier parte del mundo**.
 
-## 🚀 Características Principales
+## 💎 Características Premium (v10.2 Master)
 
-- **🔍 Búsqueda Inteligente:** Filtra automáticamente negocios sin sitio web oficial.
-- **📍 Cobertura Global:** Soporte para múltiples países (Colombia, España, México, USA, Argentina, Chile, Perú y más).
-- **🎯 Nichos Curados:** Selector con más de 50 nichos y subnichos organizados por categorías con emojis (Salud, Gastronomía, Construcción, etc.).
-- **🗺️ Geocerca por Zonas:** Opción para buscar por toda la ciudad o por cuadrantes (Norte, Sur, Este, Oeste) para una prospección profunda.
-- **📊 Dashboard CRM:** Visualiza tus leads en tiempo real con filtros por nicho, ciudad y fecha.
-- **📥 Exportación:** Descarga tus bases de datos filtradas en formato CSV compatible con Excel.
-- **🤖 Automatización con Playwright:** Navegación robusta que simula comportamiento humano para evitar bloqueos.
+### 🌪️ Prospección Universal Multi-Nicho
+- **+150 Sub-nichos Especializados:** Desde salud y gastronomía hasta industria pesada y servicios digitales.
+- **Modo Deep Scan:** Iteración automática para una cobertura del 100% de los negocios en una zona.
+- **Búsqueda Flexible:** Configura búsquedas específicas para cualquier tipo de empresa o servicio.
+
+### 🎯 Estrategia de Ventas (Matchmaker)
+- **Perfiles de Especialista:** Modos configurados según tu profesión:
+  - **🌐 Diseñador Web:** Filtra negocios con alta reputación pero sin web.
+  - **📸 Fotógrafo / Creador:** Identifica locales que necesitan contenido visual de impacto.
+  - **🚀 Agencia de Ads:** Encuentra nichos de alto ticket con presupuesto para publicidad.
+  - **🛡️ Gestor de Reputación:** Localiza negocios que necesitan mejorar su imagen pública.
+- **Lead Scoring 🔥:** Calificación automática de prospectos (Oro, Bueno, Frío).
+- **WhatsApp Directo 📲:** Contacto instantáneo con guiones de venta personalizados.
+
+### 🗺️ Inteligencia Geográfica Táctica
+- **Mapa Interactivo (Folium/OSM):** Visualiza tus prospectos con tooltips clicables.
+- **Soporte Global:** Selección jerárquica para +30 países o búsqueda manual universal (Todo el mundo).
+- **Geocerca Radial:** Escaneo por cuadrantes (Norte, Sur, Este, Oeste) para barridos profundos.
+
+### 🎨 UI/UX Cyber-Pro
+- **Interfaz Bento Box:** Diseño modular moderno y minimalista en Dark Mode.
+- **Estética Cyberpunk:** Gris carbón con acentos **Verde Neón (#39FF14)**.
 
 ## 🛠️ Instalación
 
@@ -22,49 +37,19 @@ Asegúrate de tener Python 3.10+ instalado. Luego, sigue estos pasos:
    cd Scrapper-Leads-Google
    ```
 
-2. **Crear y activar un entorno virtual:**
+2. **Entorno Virtual y Dependencias:**
    ```bash
    python3 -m venv venv
-   source venv/bin/activate  # En Linux/Mac
-   # venv\Scripts\activate   # En Windows
-   ```
-
-3. **Instalar dependencias:**
-   ```bash
+   source venv/bin/activate  # Linux/Mac
    pip install -r requirements.txt
-   ```
-
-4. **Instalar navegadores de Playwright:**
-   ```bash
    playwright install chromium
-   # Si estás en Linux, puede que necesites:
-   # sudo playwright install-deps
    ```
 
-## 🖥️ Uso del Dashboard
-
-Para lanzar la interfaz visual y empezar a captar leads, ejecuta:
+## 🖥️ Ejecución
 
 ```bash
 streamlit run app.py
 ```
 
-1. Selecciona el **País**, **Departamento** y **Ciudad**.
-2. Elige el **Nicho** o escribe uno personalizado.
-3. Define la **Zona de búsqueda** (Norte, Sur, Toda la ciudad, etc.).
-4. Ajusta el número de resultados y dale a **🚀 INICIAR**.
-
-## 📁 Estructura del Proyecto
-
-- `app.py`: Interfaz principal en Streamlit y lógica del dashboard.
-- `main.py`: Motor de scraping independiente (CLI).
-- `geo_data.py`: Base de datos de países, departamentos y ciudades.
-- `leads.db`: Base de datos SQLite donde se guardan tus prospectos (se crea automáticamente).
-- `requirements.txt`: Librerías necesarias.
-
-## ⚠️ Descargo de Responsabilidad
-
-Esta herramienta está destinada únicamente a fines educativos y de prospección ética. El scraping de datos públicos debe realizarse respetando los términos de servicio de las plataformas y las leyes de privacidad locales (GDPR, etc.).
-
 ---
-Desarrollado con ❤️ para agencias y freelancers que buscan escalar sus ventas.
+Desarrollado para quienes no solo buscan datos, sino que buscan **cerrar contratos en cualquier sector**. 🚀🟢💎
