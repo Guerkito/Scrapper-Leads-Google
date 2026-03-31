@@ -550,10 +550,12 @@ if not df.empty:
     with col_s3: st.metric("Ciudades Cubiertas", len(filtered_df['ciudad'].unique()))
     
     # --- MAPA TÁCTICO ---
-    map_data = filtered_df.dropna(subset=['lat', 'lng'])
+    map_data = filtered_df.dropna(subset=['lat', 'lng']).copy()
     if not map_data.empty:
         st.markdown("#### 🗺️ Mapa Táctico de Prospectos")
-        st.map(map_data[['lat', 'lng']], size=20, color="#39FF14")
+        # Renombrar lng a lon para que Streamlit lo reconozca
+        map_data = map_data.rename(columns={'lat': 'lat', 'lng': 'lon'})
+        st.map(map_data[['lat', 'lon']], size=20, color="#39FF14")
 
     # --- TABLA Y DESCARGA ---
     # Calcular Lead Score y WhatsApp Link
