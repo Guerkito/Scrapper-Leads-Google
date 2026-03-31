@@ -235,10 +235,48 @@ if st.session_state.last_summary:
 st.divider()
 
 with st.sidebar:
-    st.markdown("<div class='sidebar-title'>CENTRAL COMMAND</div>", unsafe_allow_html=True)
+    st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND</h2>", unsafe_allow_html=True)
+    st.divider()
+
+    # --- PERFILES DE ESPECIALISTA (MODO ESTRATEGIA) ---
+    with st.expander("👤 PERFIL DE ESPECIALISTA", expanded=True):
+        PROFILES = {
+            "🌐 Diseñador Web": {
+                "desc": "Busca negocios con EXCELENTE reputación (Rating 4.0+) pero SIN WEB oficial. Clientes ideales para diseño de landing pages y sitios corporativos.",
+                "sug": "🏥 SALUD, ⚖️ PROFESIONAL o 🏗️ INDUSTRIAL"
+            },
+            "📸 Fotógrafo / Creador": {
+                "desc": "Se enfoca en sectores visuales. Ideal para ofrecer catálogos, menús digitales y tours 360 a negocios con alta rotación.",
+                "sug": "🍽️ GASTRONOMÍA, 🎉 EVENTOS o 💄 BELLEZA"
+            },
+            "📱 Social Media Manager": {
+                "desc": "Busca negocios en nichos de 'Estilo de Vida'. Estos clientes necesitan contenido diario y gestión de comunidades.",
+                "sug": "💄 BELLEZA, 👗 MODA o 🐾 MASCOTAS"
+            },
+            "🛡️ Gestor de Reputación": {
+                "desc": "Localiza negocios con ratings BAJOS o MEDIOS (< 3.8). Tu servicio es limpiar su imagen y conseguir reseñas positivas.",
+                "sug": "🍽️ GASTRONOMÍA, 🏥 SALUD o 🚗 AUTOMOTRIZ"
+            },
+            "📈 Experto en SEO Local": {
+                "desc": "Encuentra negocios en zonas de alta competencia que necesitan posicionarse en el 'Top 3' de Maps para captar llamadas.",
+                "sug": "⚖️ PROFESIONAL, 🏗️ INDUSTRIAL o 🏠 HOGAR"
+            },
+            "🚀 Agencia de Ads (PPC)": {
+                "desc": "Apunta a nichos de ALTO TICKET. Estos clientes tienen margen para pagar publicidad en Google y Facebook Ads.",
+                "sug": "🏠 INMOBILIARIA, ⚖️ LEGAL o 🏥 SALUD"
+            },
+            "🤖 Especialista en IA / CRM": {
+                "desc": "Busca negocios con MUCHO TRÁFICO de reseñas. Necesitan automatizar su atención al cliente con IA y CRM.",
+                "sug": "🍽️ GASTRONOMÍA, 🏥 SALUD o 🎉 EVENTOS"
+            }
+        }
+        perfil_sel = st.selectbox("TU ROL DE VENTAS:", list(PROFILES.keys()))
+        st.info(f"💡 **ESTRATEGIA:** {PROFILES[perfil_sel]['desc']}")
+        st.caption(f"🎯 **Nichos sugeridos:** {PROFILES[perfil_sel]['sug']}")
+
     st.divider()
     
-    with st.expander("🌐 GEOLOCALIZACIÓN", expanded=True):
+    with st.expander("🌐 GEOLOCALIZACIÓN", expanded=False):
         modo_geo = st.radio("SISTEMA:", ["📍 LISTA DE PRECISIÓN", "🌍 MANUAL GLOBAL"])
         if modo_geo == "📍 LISTA DE PRECISIÓN":
             paises_disponibles = sorted(list(GEO_DATA.keys()))
