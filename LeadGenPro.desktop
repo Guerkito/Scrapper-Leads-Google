@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Lead Gen Pro
+Comment=Scraper de leads para Google Maps
+Exec="/home/guerk/Scrapper Clientes/lanzador.sh"
+Icon=utilities-terminal
+Path="/home/guerk/Scrapper Clientes"
+Terminal=false
+Categories=Office;Development;

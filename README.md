@@ -2,30 +2,22 @@
 
 ¡Bienvenido al **Lead Gen Pro**! La herramienta definitiva de inteligencia comercial diseñada para agencias y freelancers. Este software ha evolucionado: ya no solo busca negocios sin sitio web, sino que es una **plataforma de prospección universal** capaz de extraer, calificar y organizar leads de **cualquier nicho en cualquier parte del mundo**.
 
-## 💎 Características Premium (v10.2 Master)
+## 💎 Características Premium (v11.0 Elite)
 
 ### 🌪️ Prospección Universal Multi-Nicho
+- **Filtro de Modo Dinámico (NUEVO):** Selecciona entre modo "Caza-Sitios" (sin web) para Diseño Web o modo "SEO Audit" (con web) para agencias de Marketing.
+- **Extracción de URLs (NUEVO):** Captura automática de sitios web para auditorías de SEO y Ads.
 - **+150 Sub-nichos Especializados:** Desde salud y gastronomía hasta industria pesada y servicios digitales.
 - **Modo Deep Scan:** Iteración automática para una cobertura del 100% de los negocios en una zona.
-- **Búsqueda Flexible:** Configura búsquedas específicas para cualquier tipo de empresa o servicio.
 
 ### 🎯 Estrategia de Ventas (Matchmaker)
-- **Perfiles de Especialista:** Modos configurados según tu profesión:
-  - **🌐 Diseñador Web:** Filtra negocios con alta reputación pero sin web.
-  - **📸 Fotógrafo / Creador:** Identifica locales que necesitan contenido visual de impacto.
-  - **🚀 Agencia de Ads:** Encuentra nichos de alto ticket con presupuesto para publicidad.
-  - **🛡️ Gestor de Reputación:** Localiza negocios que necesitan mejorar su imagen pública.
+- **WhatsApp Dinámico 📲 (MEJORADO):** Los mensajes de contacto se adaptan automáticamente si el prospecto tiene o no sitio web.
+- **Perfiles de Especialista:** Modos configurados según tu profesión (Diseñador, SEO, Fotógrafo, etc.).
 - **Lead Scoring 🔥:** Calificación automática de prospectos (Oro, Bueno, Frío).
-- **WhatsApp Directo 📲:** Contacto instantáneo con guiones de venta personalizados.
 
-### 🗺️ Inteligencia Geográfica Táctica
-- **Mapa Interactivo (Folium/OSM):** Visualiza tus prospectos con tooltips clicables.
-- **Soporte Global:** Selección jerárquica para +30 países o búsqueda manual universal (Todo el mundo).
-- **Geocerca Radial:** Escaneo por cuadrantes (Norte, Sur, Este, Oeste) para barridos profundos.
-
-### 🎨 UI/UX Cyber-Pro
-- **Interfaz Bento Box:** Diseño modular moderno y minimalista en Dark Mode.
-- **Estética Cyberpunk:** Gris carbón con acentos **Verde Neón (#39FF14)**.
+### 🚀 Lanzamiento Rápido (Desktop)
+- **Acceso Directo en Linux:** Abre la aplicación desde tu menú de inicio buscando **"Lead Gen Pro"**. ¡Adiós a la terminal!
+- **Script Lanzador:** Ejecución simplificada con un solo clic.
 
 ## 🛠️ Instalación
 
@@ -47,8 +39,12 @@ Asegúrate de tener Python 3.10+ instalado. Luego, sigue estos pasos:
 
 ## 🖥️ Ejecución
 
+### Opción A (Recomendada):
+Busca **"Lead Gen Pro"** en tu menú de aplicaciones de Linux.
+
+### Opción B (Terminal):
 ```bash
-streamlit run app.py
+bash lanzador.sh
 ```
 
 ---
