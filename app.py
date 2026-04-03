@@ -5,9 +5,8 @@ from playwright.async_api import async_playwright
 import sqlite3
 import datetime
 import urllib.parse
+import re
 from geo_data import GEO_DATA
-import threading
-import queue
 import time
 
 # --- INITIALIZE STATE ---
@@ -39,7 +38,6 @@ def init_db():
         estado TEXT DEFAULT 'Nuevo',
         notas TEXT)''')
     
-    # Migración de columnas si ya existe la DB
     cols = [
         ("lat", "REAL"), ("lng", "REAL"), ("reseñas", "TEXT"), 
         ("tipo", "TEXT"), ("zona", "TEXT"), ("ciudad", "TEXT"), 
@@ -69,71 +67,22 @@ def save_lead(lead):
 init_db()
 
 # --- INTERFACE CONFIG ---
-st.set_page_config(page_title="Lead Gen Pro | Suite", layout="wide", page_icon="🟢")
+st.set_page_config(page_title="Lead Gen Pro | Elite Suite", layout="wide", page_icon="🟢")
 
 # --- CYBER CSS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
-    
-    /* Ajustes Globales */
     .stApp { background-color: #0a0a0a; font-family: 'Inter', sans-serif; color: #ffffff; }
     .neon-text { color: #39FF14; text-shadow: 0 0 8px rgba(57, 255, 20, 0.3); font-weight: 800; }
-    
-    /* Sidebar y Widgets */
     [data-testid="stSidebar"] { min-width: 320px !important; }
     .stWidgetLabel { white-space: normal !important; word-break: break-word !important; font-size: 0.9rem !important; }
-    
-    /* Expanders */
-    [data-testid="stExpander"] { 
-        background-color: #1a1a1a !important; 
-        border: 1px solid #333 !important; 
-        border-radius: 10px !important; 
-        margin-bottom: 10px !important;
-        padding: 2px !important;
-    }
-    
-    /* Botones */
-    .stButton>button { 
-        width: 100% !important;
-        background: #111111 !important; 
-        color: #39FF14 !important; 
-        border: 1px solid #39FF14 !important; 
-        border-radius: 8px !important; 
-        font-weight: 700 !important; 
-        padding: 0.5rem !important;
-    }
+    [data-testid="stExpander"] { background-color: #1a1a1a !important; border: 1px solid #333 !important; border-radius: 10px !important; margin-bottom: 10px !important; }
+    .stButton>button { width: 100% !important; background: #111111 !important; color: #39FF14 !important; border: 1px solid #39FF14 !important; border-radius: 8px !important; font-weight: 700 !important; }
     .stButton>button:hover { background: #39FF14 !important; color: #000000 !important; box-shadow: 0 0 15px rgba(57, 255, 20, 0.4) !important; }
-    
-    /* Métricas (Números del CRM y Scanner) */
-    div[data-testid="stMetric"] { 
-        background: #161616; 
-        border-radius: 15px; 
-        padding: 10px 15px !important; 
-        border: 1px solid #252525;
-        overflow: hidden;
-    }
-    div[data-testid="stMetricValue"] { 
-        color: #39FF14 !important; 
-        font-weight: 800; 
-        font-size: 1.5rem !important; /* Tamaño optimizado para no desbordar */
-    }
-    div[data-testid="stMetricLabel"] { font-size: 0.8rem !important; color: #888 !important; }
-
-    /* Pestañas (Tabs) */
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #161616 !important;
-        border: 1px solid #333 !important;
-        border-radius: 8px 8px 0 0 !important;
-        padding: 10px 20px !important;
-        color: #888 !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #39FF14 !important;
-        color: #000 !important;
-        font-weight: bold !important;
-    }
+    div[data-testid="stMetric"] { background: #161616; border-radius: 15px; padding: 10px 15px !important; border: 1px solid #252525; }
+    div[data-testid="stMetricValue"] { color: #39FF14 !important; font-weight: 800; font-size: 1.5rem !important; }
+    .stTabs [aria-selected="true"] { background-color: #39FF14 !important; color: #000 !important; font-weight: bold !important; border-radius: 8px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -173,7 +122,8 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                 if feed:
                     await feed.evaluate("el => el.scrollBy(0, 1500)")
                     await asyncio.sleep(2)
-                    if len(await page.query_selector_all("a.hfpxzc")) == len(items): break
+                    new_items = await page.query_selector_all("a.hfpxzc")
+                    if len(new_items) == len(items): break
                     continue
                 else: break
 
@@ -187,61 +137,74 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                 await item.scroll_into_view_if_needed()
                 await asyncio.sleep(0.5)
                 
-                # Súper-clic
+                # Súper-clic resistente
                 try: await item.click(timeout=3000, force=True)
                 except: await item.evaluate("el => el.click()")
                 
+                # Esperar a que cargue el panel
                 try: await page.wait_for_selector("h1.DUwDvf", timeout=5000)
                 except: continue
 
+                # DETECTOR DE WEB MULTICAPA
+                web_url = "Sin sitio web"
                 web_btn = await page.query_selector("a[data-item-id='authority']")
-                web_url = await web_btn.get_attribute("href") if web_btn else "Sin sitio web"
+                if web_btn:
+                    web_url = await web_btn.get_attribute("href")
+                else:
+                    # Intento alternativo por selector de icono de web
+                    alt_web = await page.query_selector('a[aria-label*="Sitio web"], a[aria-label*="Website"]')
+                    if alt_web: web_url = await alt_web.get_attribute("href")
                 
-                # Filtrado con motivo en el log
-                tiene_web = web_btn is not None
-                es_caza_sitios = "Caza-Sitios" in modo_escaneo
-                es_seo_audit = "SEO Audit" in modo_escaneo
+                tiene_web = web_url != "Sin sitio web"
                 
-                if es_caza_sitios and tiene_web:
-                    log_area.write(f"⏭️ Saltado: {name} (Ya tiene web)")
-                    continue
-                elif es_seo_audit and not tiene_web:
-                    log_area.write(f"⏭️ Saltado: {name} (No tiene web)")
-                    continue
-                elif "Full Scan" not in modo_escaneo and not (es_caza_sitios or es_seo_audit):
-                    # Por seguridad, si no hay modo claro, no saltar
-                    pass
+                # LÓGICA DE FILTRADO MEJORADA
+                if "Full Scan" in modo_escaneo:
+                    guardar = True
+                elif "Caza-Sitios" in modo_escaneo and not tiene_web:
+                    guardar = True
+                elif "SEO Audit" in modo_escaneo and tiene_web:
+                    guardar = True
+                else:
+                    guardar = False
+                
+                if guardar:
+                    tipo_el = await page.query_selector('button[class="Dener"]')
+                    tipo_txt = await tipo_el.inner_text() if tipo_el else "N/A"
+                    
+                    lat, lng = None, None
+                    for _ in range(5):
+                        curr_url = page.url
+                        match = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", curr_url)
+                        if not match: match = re.search(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)", curr_url)
+                        if match:
+                            lat, lng = float(match.group(1)), float(match.group(2))
+                            break
+                        await asyncio.sleep(0.5)
 
-                # Extracción
-                tipo_el = await page.query_selector('button[class="Dener"]')
-                tipo_txt = await tipo_el.inner_text() if tipo_el else "N/A"
-                
-                lat, lng = None, None
-                for _ in range(5):
-                    match = urllib.parse.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", page.url)
-                    if not match: match = urllib.parse.search(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)", page.url)
-                    import re
-                    match = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", page.url)
-                    if not match: match = re.search(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)", page.url)
-                    if match:
-                        lat, lng = float(match.group(1)), float(match.group(2))
-                        break
-                    await asyncio.sleep(0.5)
+                    phone_el = await page.query_selector('button[data-item-id^="phone:tel:"]')
+                    phone = await phone_el.inner_text() if phone_el else "N/A"
+                    
+                    rating = "N/A"
+                    rating_el = await page.query_selector("span[aria-label*='estrellas']")
+                    if rating_el:
+                        r_raw = await rating_el.get_attribute("aria-label")
+                        m_r = re.search(r"(\d[,\.]\d)", r_raw)
+                        if m_r: rating = f"{m_r.group(1).replace(',', '.')} / 5"
+                    
+                    # Extraer reseñas
+                    rev_num = "0"
+                    rev_el = await page.query_selector("span[aria-label*='reseñas'], span[aria-label*='opiniones']")
+                    if rev_el:
+                        rev_raw = await rev_el.get_attribute("aria-label")
+                        rev_num = "".join(filter(str.isdigit, rev_raw)) or "0"
 
-                phone_el = await page.query_selector('button[data-item-id^="phone:tel:"]')
-                phone = await phone_el.inner_text() if phone_el else "N/A"
-                
-                rating = "N/A"
-                rating_el = await page.query_selector("span[aria-label*='estrellas']")
-                if rating_el:
-                    r_raw = await rating_el.get_attribute("aria-label")
-                    m_r = re.search(r"(\d[,\.]\d)", r_raw)
-                    if m_r: rating = f"{m_r.group(1).replace(',', '.')} / 5"
-                
-                save_lead({"Nombre": name, "Teléfono": phone, "Rating": rating, "Reseñas": "S/D", "Tipo": tipo_txt, "Lat": lat, "Lng": lng, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val, "Web": web_url})
-                found += 1
-                count_text.metric("Encontrados", found)
-                log_area.write(f"✅ CAPTURADO: {name}")
+                    save_lead({"Nombre": name, "Teléfono": phone, "Rating": rating, "Reseñas": rev_num, "Tipo": tipo_txt, "Lat": lat, "Lng": lng, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val, "Web": web_url})
+                    found += 1
+                    count_text.metric("Encontrados", found)
+                    log_area.write(f"✅ CAPTURADO: {name} ({'Web' if tiene_web else 'No Web'})")
+                else:
+                    motivo = "Ya tiene web" if "Caza-Sitios" in modo_escaneo else "No tiene web"
+                    log_area.write(f"⏭️ Saltado: {name} ({motivo})")
                 
             except: continue
     finally:
@@ -285,10 +248,19 @@ with st.sidebar:
     st.divider()
     modo_escaneo = st.selectbox("MODO DE ESCANEO:", ["🎯 Caza-Sitios (Solo SIN web)", "📈 SEO Audit (Solo CON web)", "🔎 Full Scan (Todo)"])
     
-    with st.expander("🌐 GEOLOCALIZACIÓN", expanded=False):
+    with st.expander("🌐 GEOLOCALIZACIÓN", expanded=True):
         pais = st.selectbox("PAÍS", sorted(list(GEO_DATA.keys())))
         depto = st.selectbox("ESTADO", sorted(list(GEO_DATA[pais].keys())))
         ciudad_base = st.selectbox("CIUDAD", sorted(GEO_DATA[pais][depto]))
+        
+        st.divider()
+        tipo_zona = st.radio("COBERTURA RADIAL:", ["📍 TODA LA CIUDAD", "📍 CENTRO", "⬆️ NORTE", "⬇️ SUR", "⬅️ ESTE", "➡️ OESTE", "🧩 BARRIOS ESPECÍFICOS"])
+        if tipo_zona == "🧩 BARRIOS ESPECÍFICOS":
+            barrios = st.text_area("LISTA DE BARRIOS:", "Zona 1\nZona 2").split("\n")
+        elif tipo_zona == "📍 TODA LA CIUDAD":
+            barrios = [""]
+        else:
+            barrios = [tipo_zona.replace("📍 ", "").replace("⬆️ ", "").replace("⬇️ ", "").replace("⬅️ ", "").replace("➡️ ", "")]
     
     with st.expander("🎯 NICHO Y SECTOR", expanded=True):
         NICHOS_DICT = {
@@ -311,19 +283,15 @@ with st.sidebar:
     st.divider()
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        start_btn = st.button("🚀 INICIAR", type="primary", use_container_width=True)
+        if st.button("🚀 INICIAR", type="primary", use_container_width=True):
+            st.session_state.last_summary = None
+            st.session_state.stop_requested = False
+            asyncio.run(main_loop(nicho, ciudad_base, pais, barrios, max_res, ver_nav, infinito, modo_escaneo, NICHOS_DICT))
+            st.rerun()
     with col_btn2:
-        stop_btn = st.button("🛑 PARAR", use_container_width=True)
-
-    if start_btn:
-        st.session_state.last_summary = None
-        st.session_state.stop_requested = False
-        asyncio.run(main_loop(nicho, ciudad_base, pais, [""], max_res, ver_nav, infinito, modo_escaneo, NICHOS_DICT))
-        st.rerun()
-    
-    if stop_btn:
-        st.session_state.stop_requested = True
-        st.warning("🛑 Solicitando parada... el proceso se detendrá en el próximo lead.")
+        if st.button("🛑 PARAR", use_container_width=True):
+            st.session_state.stop_requested = True
+            st.warning("Parando...")
 
 with tab_scan:
     st.markdown("<h1 class='neon-text'>🛰️ SCANNER DE LEADS</h1>", unsafe_allow_html=True)
@@ -355,15 +323,32 @@ with tab_crm:
             from streamlit_folium import st_folium
             m = folium.Map(location=[map_data["lat"].mean(), map_data["lng"].mean()], zoom_start=12, tiles="CartoDB dark_matter")
             for _, row in map_data.iterrows():
-                folium.CircleMarker([row['lat'], row['lng']], radius=8, color="#39FF14", fill=True).add_to(m)
+                wa_link = f"https://wa.me/{''.join(filter(str.isdigit, str(row['telefono'])))}"
+                popup = f"<b>{row['nombre']}</b><br>Rating: {row['rating']}<br><a href='{wa_link}' target='_blank'>WhatsApp 📲</a>"
+                folium.CircleMarker([row['lat'], row['lng']], radius=8, color="#39FF14", fill=True, popup=folium.Popup(popup, max_width=300)).add_to(m)
             st_folium(m, width=1200, height=400, key="crm_map")
         
         st.divider()
         st.markdown("#### 📝 Gestión de Prospectos")
+        
+        # WhatsApp Link Gen para tabla
+        df_display = df.copy()
+        def get_wa(row):
+            phone = "".join(filter(str.isdigit, str(row['telefono'])))
+            if not phone or len(phone) < 7: return "N/A"
+            msg = f"Hola {row['nombre']}, vi tu perfil en Maps. Tienes {row['rating']} estrellas pero no tienes tu web oficial. ¿Te ayudo?"
+            return f"https://wa.me/{phone}?text={urllib.parse.quote(msg)}"
+        df_display['WhatsApp'] = df_display.apply(get_wa, axis=1)
+
         edited_df = st.data_editor(
-            df[['id', 'estado', 'notas', 'nombre', 'web', 'telefono', 'rating', 'ciudad', 'nicho']],
-            column_config={"estado": st.column_config.SelectboxColumn("Estado", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]), "web": st.column_config.LinkColumn("Web"), "id": None},
-            disabled=["nombre", "web", "telefono", "rating", "ciudad", "nicho"],
+            df_display[['id', 'estado', 'notas', 'nombre', 'web', 'WhatsApp', 'telefono', 'rating', 'ciudad', 'nicho']],
+            column_config={
+                "estado": st.column_config.SelectboxColumn("Estado", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]),
+                "web": st.column_config.LinkColumn("Web"),
+                "WhatsApp": st.column_config.LinkColumn("Contactar 📲"),
+                "id": None
+            },
+            disabled=["nombre", "web", "WhatsApp", "telefono", "rating", "ciudad", "nicho"],
             hide_index=True, width="stretch"
         )
         
@@ -375,18 +360,9 @@ with tab_crm:
             st.success("✅ CRM Actualizado"); time.sleep(1); st.rerun()
 
         st.divider()
-        st.subheader("⚙️ Zona de Peligro")
         if st.button("🗑️ Borrar Toda la Base de Datos"):
-            if st.session_state.get('confirm_delete', False):
-                conn = sqlite3.connect('leads.db')
-                conn.execute("DELETE FROM leads")
-                conn.commit(); conn.close()
-                st.session_state.confirm_delete = False
-                st.success("💥 Base de datos borrada por completo")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.warning("⚠️ ¿Estás seguro? Haz clic de nuevo para confirmar el borrado total.")
-                st.session_state.confirm_delete = True
-    else:
-        st.info("Escanea leads para verlos aquí.")
+            if st.session_state.get('confirm_del', False):
+                conn = sqlite3.connect('leads.db'); conn.execute("DELETE FROM leads"); conn.commit(); conn.close()
+                st.session_state.confirm_del = False; st.rerun()
+            else: st.warning("¿Seguro? Dale otra vez."); st.session_state.confirm_del = True
+    else: st.info("Escanea leads para verlos aquí.")
