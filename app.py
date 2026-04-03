@@ -35,10 +35,15 @@ def save_lead(lead):
 
 init_db()
 
+# --- PREFIJOS TELEFÓNICOS ---
+COUNTRY_CODES = {
+    "Colombia": "57", "España": "34", "México": "52", "Argentina": "54", "Chile": "56", 
+    "Perú": "51", "Ecuador": "593", "Venezuela": "58", "Estados Unidos": "1", "Panamá": "507"
+}
+
 # --- INTERFACE CONFIG ---
 st.set_page_config(page_title="Lead Gen Pro | Elite Suite", layout="wide", page_icon="🟢")
 
-# --- CYBER CSS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -49,17 +54,29 @@ st.markdown("""
     .stButton>button { width: 100% !important; background: #111111 !important; color: #39FF14 !important; border: 1px solid #39FF14 !important; border-radius: 8px !important; font-weight: 700 !important; }
     .stButton>button:hover { background: #39FF14 !important; color: #000000 !important; box-shadow: 0 0 15px rgba(57, 255, 20, 0.4) !important; }
     div[data-testid="stMetric"] { background: #161616; border-radius: 12px; padding: 10px !important; border: 1px solid #252525; }
-    /* Ajuste para pantalla completa */
-    .main .block-container { padding-top: 2rem; padding-bottom: 1rem; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- UTILS ---
-def get_wa_link(row):
-    p = "".join(filter(str.isdigit, str(row['telefono'])))
-    if not p or len(p) < 7: return "#"
-    msg = f"Hola {row['nombre']}, vi tu negocio de {row['tipo']} en Google Maps. Tienes una puntuación de {row['rating']} y me gustaría comentarte algo sobre tu presencia online. ¿Hablamos?"
-    return f"https://wa.me/{p}?text={urllib.parse.quote(msg)}"
+def get_wa_link(row, country_name):
+    num_clean = "".join(filter(str.isdigit, str(row['telefono'])))
+    if not num_clean or len(num_clean) < 7: return None
+    
+    # Añadir prefijo si no lo tiene
+    prefix = COUNTRY_CODES.get(country_name, "")
+    if prefix and not num_clean.startswith(prefix):
+        num_clean = prefix + num_clean
+    
+    name = row['nombre']
+    tipo = row['tipo'] if row['tipo'] != "N/A" else "negocio"
+    rating = row['rating']
+    
+    if rating != "N/A":
+        msg = f"Hola {name}, vi tu {tipo} en Google Maps. Tienes una gran puntuación de {rating} y me gustaría ayudarte con tu presencia online. ¿Hablamos?"
+    else:
+        msg = f"Hola {name}, vi tu {tipo} en Google Maps y me pareció muy interesante. Me gustaría comentarte algo sobre tu visibilidad digital. ¿Hablamos?"
+        
+    return f"https://wa.me/{num_clean}?text={urllib.parse.quote(msg)}"
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -68,26 +85,93 @@ with st.sidebar:
     modo_escaneo = st.selectbox("MODO DE ESCANEO:", ["🎯 Caza-Sitios (Solo SIN web)", "📈 SEO Audit (Solo CON web)", "🔎 Full Scan (Todo)"])
     
     with st.expander("🌐 GEOLOCALIZACIÓN", expanded=True):
-        pais = st.selectbox("PAÍS", sorted(list(GEO_DATA.keys())))
-        depto = st.selectbox("ESTADO", sorted(list(GEO_DATA[pais].keys())))
-        ciudad_base = st.selectbox("CIUDAD", sorted(GEO_DATA[pais][depto]))
+        pais_sel = st.selectbox("PAÍS", sorted(list(GEO_DATA.keys())))
+        depto = st.selectbox("ESTADO", sorted(list(GEO_DATA[pais_sel].keys())))
+        ciudad_base = st.selectbox("CIUDAD", sorted(GEO_DATA[pais_sel][depto]))
         st.divider()
         tipo_zona = st.radio("COBERTURA:", ["📍 TODA LA CIUDAD", "📍 CENTRO", "⬆️ NORTE", "⬇️ SUR", "🧩 BARRIOS"])
         barrios = st.text_area("LISTA DE BARRIOS:", "Zona Centro").split("\n") if tipo_zona == "🧩 BARRIOS" else ([tipo_zona.replace("📍 ","").replace("⬆️ ","").replace("⬇️ ","")] if tipo_zona != "📍 TODA LA CIUDAD" else [""])
     
     with st.expander("🎯 NICHO Y SECTOR", expanded=True):
         NICHOS_DICT = {
-            "🌎 TODOS": ["Todos los Negocios (General)"],
-            "🏥 SALUD": ["TODOS LOS SUBNICHOS (Sector Salud)", "Odontólogos", "Clínicas", "Ópticas", "Psicólogos"],
-            "🍽️ GASTRO": ["TODOS LOS SUBNICHOS (Sector Gastro)", "Restaurantes", "Cafés", "Pizzerías"],
-            "🚗 MOTOR": ["TODOS LOS SUBNICHOS (Sector Motor)", "Talleres", "Repuestos", "Lavaderos"],
-            "💄 BELLEZA": ["TODOS LOS SUBNICHOS (Sector Belleza)", "Peluquerías", "Spas", "Estética"],
-            "⚖️ PROFESIONAL": ["TODOS LOS SUBNICHOS (Sector Prof)", "Abogados", "Contadores", "Notarías"]
+            "🌎 TODO EL MERCADO": ["TODOS LOS NEGOCIOS (Barrido Total)", "Empresas locales", "Servicios profesionales", "Establecimientos comerciales"],
+            "🏥 SALUD & MEDICINA": [
+                "TODOS LOS SUBNICHOS (Sector Salud)", "Odontólogos", "Clínicas Médicas", "Psicólogos", "Fisioterapeutas", "Ópticas", "Dermatólogos", 
+                "Ginecólogos", "Pediatras", "Cardiólogos", "Oftalmólogos", "Centros de Estética", "Cirujanos Plásticos", "Laboratorios Clínicos", 
+                "Farmacias", "Podólogos", "Nutricionistas", "Ortopedistas", "Urólogos", "Centros de Rehabilitación", "Psiquiatras", "Veterinarias"
+            ],
+            "🍽️ GASTRONOMÍA & OCIO": [
+                "TODOS LOS SUBNICHOS (Sector Gastro)", "Restaurantes", "Cafeterías", "Pizzerías", "Hamburgueserías", "Panaderías", "Pastelerías", 
+                "Bares", "Discotecas", "Sushi", "Comida Vegana", "Comida Mexicana", "Comida Italiana", "Steakhouse", "Heladerías", "Catering", 
+                "Licorerías", "Food Trucks", "Casas de Banquetes"
+            ],
+            "🚗 SECTOR AUTOMOTRIZ": [
+                "TODOS LOS SUBNICHOS (Sector Motor)", "Talleres Mecánicos", "Concesionarios", "Compraventa de Autos", "Venta de Repuestos", 
+                "Llantas y Neumáticos", "Lavado de Autos (Spa)", "Centros de Diagnóstico (CDA)", "Tapicería Automotriz", "Grúas y Asistencia", 
+                "Motos (Venta y Taller)", "Montallantas", "Pintura Automotriz", "Alquiler de Vehículos"
+            ],
+            "🏠 CONSTRUCCIÓN & HOGAR": [
+                "TODOS LOS SUBNICHOS (Sector Hogar)", "Inmobiliarias", "Arquitectos", "Constructoras", "Ferreterías", "Materiales de Construcción", 
+                "Reformas e Instalaciones", "Pintores", "Electricistas", "Plomeros/Fontaneros", "Carpinterías", "Cerrajeros", "Vidrierías", 
+                "Mueblerías", "Decoración de Interiores", "Aire Acondicionado", "Energía Solar", "Sistemas de Seguridad", "Impermeabilizaciones"
+            ],
+            "💄 BELLEZA & BIENESTAR": [
+                "TODOS LOS SUBNICHOS (Sector Belleza)", "Peluquerías", "Barberías", "Spas", "Centros de Uñas (Nails)", "Estética Facial", 
+                "Tatuajes (Tattoo Shops)", "Gimnasios", "Centros de CrossFit", "Yoga y Pilates", "Escuelas de Baile", "Masajes Relajantes", 
+                "Depilación Láser", "Maquillaje Profesional"
+            ],
+            "⚖️ PROFESIONALES & LEGAL": [
+                "TODOS LOS SUBNICHOS (Sector Profesional)", "Abogados", "Contadores", "Notarías", "Asesores Fiscales", "Agencias de Seguros", 
+                "Consultoría de Negocios", "Agencias de Viajes", "Inmobiliarias", "Arquitectos", "Ingenieros Civiles", "Diseñadores Gráficos", 
+                "Agencias de Marketing", "Desarrolladores de Software", "Fotógrafos", "Productores Audiovisuales"
+            ],
+            "🏗️ INDUSTRIAL & TÉCNICO": [
+                "TODOS LOS SUBNICHOS (Sector Industrial)", "Fábricas", "Logística y Transporte", "Parques Industriales", "Maquinaria Pesada", 
+                "Reciclaje", "Tratamiento de Aguas", "Empresas de Limpieza", "Mantenimiento Industrial", "Control de Plagas", "Embalajes", 
+                "Químicos", "Textiles", "Maderas", "Metalúrgicas"
+            ],
+            "🎓 EDUCACIÓN & FORMACIÓN": [
+                "TODOS LOS SUBNICHOS (Sector Educación)", "Colegios Privados", "Jardines Infantiles", "Academias de Idiomas", "Universidades", 
+                "Escuelas de Conducción", "Tutorías y Refuerzo", "Academias de Música", "Escuelas de Arte", "Centros de Capacitación", 
+                "Librerías", "Bibliotecas"
+            ],
+            "💻 TECNOLOGÍA & DIGITAL": [
+                "TODOS LOS SUBNICHOS (Sector Digital)", "Reparación de Celulares", "Soporte Técnico PC", "Venta de Tecnología", 
+                "Tiendas de Electrónica", "Proveedores de Internet", "Desarrollo Web", "Agencias SEO", "Hosting", "Ciberseguridad", 
+                "Instalación de CCTV"
+            ],
+            "👗 MODA & RETAIL": [
+                "TODOS LOS SUBNICHOS (Sector Moda)", "Tiendas de Ropa", "Zapaterías", "Joyerías", "Centros Comerciales", "Supermercados", 
+                "Tiendas de Regalos", "Floristerías", "Jugueterías", "Ópticas", "Tiendas Deportivas", "Relojerías", "Marroquinería"
+            ],
+            "🐾 MASCOTAS": [
+                "TODOS LOS SUBNICHOS (Sector Mascotas)", "Veterinarias", "Peluquería Canina", "Tiendas de Mascotas", "Entrenadores Caninos", 
+                "Guarderías para Perros", "Cementerios de Mascotas", "Acuarios"
+            ],
+            "🎉 EVENTOS & TURISMO": [
+                "TODOS LOS SUBNICHOS (Sector Turismo)", "Hoteles", "Hostales", "Salones de Eventos", "Fotógrafos de Bodas", "Alquiler de Trajes", 
+                "Agencias de Viajes", "Guías Turísticos", "Parques de Diversiones", "Museos", "Galerías de Arte"
+            ],
+            "👔 SERVICIOS EMPRESARIALES": [
+                "TODOS LOS SUBNICHOS (Sector B2B)", "Seguridad Privada", "Mensajería y Envíos", "Mudanzas", "Lavanderías Industriales", 
+                "Alquiler de Equipos", "Publicidad Exterior", "Imprentas y Litografías", "Papelerías al por mayor", "Suministros de Oficina"
+            ],
+            "⛪ OTROS": ["Iglesias", "ONGs", "Fundaciones", "Clubes Sociales", "Funerarias", "Centros Comunitarios"]
         }
-        cat = st.selectbox("CATEGORÍA:", list(NICHOS_DICT.keys()))
-        sub = st.selectbox("NICHO:", NICHOS_DICT[cat])
-        exhaustivo = st.toggle("🚀 MODO EXHAUSTIVO TOTAL", False)
-        nicho = "MODO_EXHAUSTIVO_TOTAL" if exhaustivo else (f"SECTOR_{cat}" if "TODOS LOS" in sub else sub)
+        
+        cat_sel = st.selectbox("CATEGORÍA PRINCIPAL:", list(NICHOS_DICT.keys()))
+        sub_sel = st.selectbox("NICHO ESPECÍFICO:", NICHOS_DICT[cat_sel])
+        
+        exhaustivo = st.toggle("🚀 MODO EXHAUSTIVO TOTAL (+250 Nichos)", False, help="Busca literalmente en CADA sub-nicho de la lista. Es el barrido más potente posible.")
+        
+        if exhaustivo:
+            nicho = "MODO_EXHAUSTIVO_TOTAL"
+            st.warning("⚡ MODO EXHAUSTIVO: Se buscará en todos los sectores.")
+        elif "TODOS LOS SUBNICHOS" in sub_sel:
+            nicho = f"SECTOR_{cat_sel}"
+            st.info(f"📂 Barrido completo del sector: {cat_sel}")
+        else:
+            nicho = sub_sel
     
     max_res = st.number_input("CAPACIDAD:", 5, 5000, 50)
     infinito = st.toggle("♾️ ILIMITADO", False)
@@ -99,14 +183,13 @@ with st.sidebar:
     stop_btn = c2.button("🛑 PARAR")
     if stop_btn: st.session_state.stop_requested = True
 
-# --- DASHBOARD HEADER ---
+# --- DASHBOARD ---
 st.markdown("<h1 style='font-size: 2.2em; margin-bottom:0;'>LEAD GEN <span class='neon-text'>PRO ELITE</span></h1>", unsafe_allow_html=True)
 
 conn = sqlite3.connect('leads.db')
 df_all = pd.read_sql_query("SELECT * FROM leads", conn)
 conn.close()
 
-# Métricas rápidas
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("🎯 OBJETIVO", "∞" if infinito else max_res)
 m2.metric("🆕 NUEVOS", len(df_all[df_all['estado'] == 'Nuevo']))
@@ -118,108 +201,90 @@ m6.metric("🌍 TOTAL", len(df_all))
 log_container = st.empty()
 if st.session_state.last_summary:
     st.success(f"🔥 Operación finalizada: {st.session_state.last_summary['leads']} capturados.")
-    if st.button("Cerrar resumen"): st.session_state.last_summary = None; st.rerun()
+    if st.button("Limpiar resumen"): st.session_state.last_summary = None; st.rerun()
 
-# --- SELECTOR DE VISTA ---
 st.divider()
-view_mode = st.radio("💎 SELECCIONAR VISTA DE TRABAJO:", ["🌓 VISTA DIVIDIDA", "🗺️ MAPA TOTAL", "📝 GESTIÓN TOTAL (CRM)"], horizontal=True)
+view_mode = st.radio("💎 VISTA DE TRABAJO:", ["🌓 DIVIDIDA", "🗺️ MAPA FULL", "📝 CRM FULL"], horizontal=True)
 
-# --- FILTROS GLOBALES DEL CRM ---
-with st.expander("🔍 FILTRAR BASE DE DATOS POR CATEGORÍAS", expanded=False):
-    f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-    with f_col1:
-        nicho_f = st.multiselect("Nicho de Búsqueda:", options=df_all['nicho'].unique(), default=[])
-    with f_col2:
-        tipo_f = st.multiselect("Categoría Real (Maps):", options=df_all['tipo'].unique(), default=[])
-    with f_col3:
-        ciudad_f = st.multiselect("Ciudad:", options=df_all['ciudad'].unique(), default=[])
-    with f_col4:
-        estado_f = st.multiselect("Status:", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"], default=[])
-    
-    search_txt = st.text_input("🎯 Buscar por nombre o notas:", placeholder="Escribe para filtrar...")
+with st.expander("🔍 FILTROS AVANZADOS", expanded=False):
+    f1, f2, f3, f4 = st.columns(4)
+    nicho_f = f1.multiselect("Nicho:", df_all['nicho'].unique()) if not df_all.empty else []
+    tipo_f = f2.multiselect("Tipo:", df_all['tipo'].unique()) if not df_all.empty else []
+    ciudad_f = f3.multiselect("Ciudad:", df_all['ciudad'].unique()) if not df_all.empty else []
+    estado_f = f4.multiselect("Status:", ["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"])
 
-# Aplicar Filtros
-df_filtered = df_all.copy()
-if nicho_f: df_filtered = df_filtered[df_filtered['nicho'].isin(nicho_f)]
-if tipo_f: df_filtered = df_filtered[df_filtered['tipo'].isin(tipo_f)]
-if ciudad_f: df_filtered = df_filtered[df_filtered['ciudad'].isin(ciudad_f)]
-if estado_f: df_filtered = df_filtered[df_filtered['estado'].isin(estado_f)]
-if search_txt:
-    df_filtered = df_filtered[
-        df_filtered['nombre'].str.contains(search_txt, case=False, na=False) | 
-        df_filtered['notas'].str.contains(search_txt, case=False, na=False)
-    ]
+df_f = df_all.copy()
+if nicho_f: df_f = df_f[df_f['nicho'].isin(nicho_f)]
+if tipo_f: df_f = df_f[df_f['tipo'].isin(tipo_f)]
+if ciudad_f: df_f = df_f[df_f['ciudad'].isin(ciudad_f)]
+if estado_f: df_f = df_f[df_f['estado'].isin(estado_f)]
 
-# Preparar datos finales
-df_edit = df_filtered.copy().sort_values(by='id', ascending=False)
-df_edit['Chat'] = df_edit.apply(get_wa_link, axis=1)
+df_edit = df_f.copy().sort_values(by='id', ascending=False)
+df_edit['Chat'] = df_edit.apply(lambda r: get_wa_link(r, pais_sel), axis=1)
 
-# Lógica de Visualización
-if view_mode == "🌓 VISTA DIVIDIDA":
-    col_l, col_r = st.columns([0.45, 0.55])
-    with col_l:
+if view_mode == "🌓 DIVIDIDA":
+    cl, cr = st.columns([0.45, 0.55])
+    with cl:
         st.markdown("#### 🗺️ Mapa Intel")
-        map_data = df_filtered.dropna(subset=['lat', 'lng']).copy()
+        map_data = df_f.dropna(subset=['lat', 'lng']).copy()
         if not map_data.empty:
             import folium
             from streamlit_folium import st_folium
             m = folium.Map(location=[map_data["lat"].mean(), map_data["lng"].mean()], zoom_start=12, tiles="CartoDB dark_matter")
             for _, row in map_data.iterrows():
-                colors = {"Nuevo": "#39FF14", "Contactado": "#FFD700", "Interesado": "#FF8C00", "Cerrado": "#00FF00", "Descartado": "#808080"}
-                c = colors.get(row['estado'], "#39FF14")
-                wa = get_wa_link(row)
-                popup = f"<b>{row['nombre']}</b><br>⭐ {row['rating']}<br><a href='{wa}' target='_blank'>Contactar 📲</a>"
-                folium.CircleMarker([row['lat'], row['lng']], radius=9, color=c, fill=True, popup=folium.Popup(popup, max_width=250)).add_to(m)
+                wa = get_wa_link(row, pais_sel)
+                btn_html = f"<a href='{wa}' target='_blank' style='background:#25D366;color:white;padding:8px;display:block;text-align:center;text-decoration:none;border-radius:5px;font-weight:bold;'>WHATSAPP 📲</a>" if wa else "<b style='color:red;display:block;text-align:center;'>NÚMERO INVÁLIDO</b>"
+                popup = f"<div style='min-width:180px'><b>{row['nombre']}</b><br>⭐ {row['rating']}<br>🏷️ {row['tipo']}<br><hr>{btn_html}</div>"
+                folium.CircleMarker([row['lat'], row['lng']], radius=10, color="#39FF14" if row['estado']=='Nuevo' else "#FFD700", fill=True, popup=folium.Popup(popup, max_width=300)).add_to(m)
             st_folium(m, width=None, height=500, key="split_map")
-    with col_r:
-        st.markdown(f"#### 📝 Gestión CRM ({len(df_filtered)} leads)")
-        edited_df = st.data_editor(
-            df_edit[['id', 'estado', 'notas', 'nombre', 'rating', 'Chat', 'tipo']],
-            column_config={"estado": st.column_config.SelectboxColumn("Status", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]), "Chat": st.column_config.LinkColumn("Chat 📲"), "id": None},
-            disabled=["nombre", "rating", "Chat", "tipo"], hide_index=True, width="stretch", height=500
-        )
-        if st.button("💾 GUARDAR CRM", type="primary"):
+    with cr:
+        st.markdown(f"#### 📝 CRM ({len(df_f)} leads)")
+        edited = st.data_editor(df_edit[['id', 'estado', 'notas', 'nombre', 'rating', 'Chat', 'tipo']], column_config={"estado": st.column_config.SelectboxColumn("Status", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]), "Chat": st.column_config.LinkColumn("Chat 📲"), "id": None}, disabled=["nombre", "rating", "Chat", "tipo"], hide_index=True, width="stretch", height=500)
+        if st.button("💾 GUARDAR", type="primary"):
             conn = sqlite3.connect('leads.db')
-            for _, row in edited_df.iterrows(): conn.execute("UPDATE leads SET estado = ?, notas = ? WHERE id = ?", (row['estado'], row['notas'], row['id']))
+            for _, r in edited.iterrows(): conn.execute("UPDATE leads SET estado = ?, notas = ? WHERE id = ?", (r['estado'], r['notas'], r['id']))
             conn.commit(); conn.close(); st.rerun()
 
-elif view_mode == "🗺️ MAPA TOTAL":
-    st.markdown(f"#### 🗺️ NAVEGACIÓN COMPLETA ({len(df_filtered)} leads)")
-    map_data = df_filtered.dropna(subset=['lat', 'lng']).copy()
+elif view_mode == "🗺️ MAPA FULL":
+    map_data = df_f.dropna(subset=['lat', 'lng']).copy()
     if not map_data.empty:
         import folium
         from streamlit_folium import st_folium
         m = folium.Map(location=[map_data["lat"].mean(), map_data["lng"].mean()], zoom_start=13, tiles="CartoDB dark_matter")
         for _, row in map_data.iterrows():
-            colors = {"Nuevo": "#39FF14", "Contactado": "#FFD700", "Interesado": "#FF8C00", "Cerrado": "#00FF00", "Descartado": "#808080"}
-            c = colors.get(row['estado'], "#39FF14")
-            wa = get_wa_link(row)
-            popup = f"<div style='min-width:200px'><b>{row['nombre']}</b><br>⭐ {row['rating']} ({row['reseñas']})<br>🏷️ {row['tipo']}<br><hr><a href='{wa}' target='_blank' style='background:#25D366;color:white;padding:5px;display:block;text-align:center;text-decoration:none;border-radius:5px'>CONTACTAR WHATSAPP</a></div>"
-            folium.CircleMarker([row['lat'], row['lng']], radius=12, color=c, fill=True, popup=folium.Popup(popup, max_width=300)).add_to(m)
+            wa = get_wa_link(row, pais_sel)
+            btn = f"<a href='{wa}' target='_blank' style='background:#25D366;color:white;padding:10px;display:block;text-align:center;text-decoration:none;border-radius:5px;font-weight:bold;'>ENVIAR WHATSAPP 📲</a>" if wa else "<b style='color:red;display:block;text-align:center;'>SIN WHATSAPP ⚠️</b>"
+            popup = f"<div style='min-width:220px'><h3 style='margin:0'>{row['nombre']}</h3><h2 style='color:#FF8C00;margin:5px 0'>⭐ {row['rating']}</h2><small>{row['tipo']}</small><br><hr>{btn}</div>"
+            folium.CircleMarker([row['lat'], row['lng']], radius=12, color="#39FF14" if row['estado']=='Nuevo' else "#FFD700", fill=True, popup=folium.Popup(popup, max_width=300)).add_to(m)
         st_folium(m, width=None, height=750, key="full_map")
 
-elif view_mode == "📝 GESTIÓN TOTAL (CRM)":
-    st.markdown(f"#### 📝 PANEL DE CONTROL ({len(df_filtered)} leads)")
-    edited_df = st.data_editor(
-        df_edit[['id', 'estado', 'notas', 'nombre', 'rating', 'reseñas', 'tipo', 'Chat', 'web', 'nicho', 'fecha', 'ciudad']],
-        column_config={
-            "estado": st.column_config.SelectboxColumn("Status", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]),
-            "Chat": st.column_config.LinkColumn("WhatsApp 📲"),
-            "web": st.column_config.LinkColumn("Sitio Web"),
-            "id": None,
-            "rating": st.column_config.TextColumn("⭐"),
-            "tipo": st.column_config.TextColumn("Categoría"),
-            "fecha": st.column_config.TextColumn("Capturado")
-        },
-        disabled=["nombre", "rating", "reseñas", "tipo", "Chat", "web", "nicho", "fecha", "ciudad"],
-        hide_index=True, width="stretch", height=700
-    )
+elif view_mode == "📝 CRM FULL":
+    edited = st.data_editor(df_edit[['id', 'estado', 'notas', 'nombre', 'rating', 'reseñas', 'tipo', 'Chat', 'web', 'nicho', 'fecha', 'ciudad']], column_config={"estado": st.column_config.SelectboxColumn("Status", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]), "Chat": st.column_config.LinkColumn("Chat 📲"), "web": st.column_config.LinkColumn("Web"), "id": None}, disabled=["nombre", "rating", "reseñas", "tipo", "Chat", "web", "nicho", "fecha", "ciudad"], hide_index=True, width="stretch", height=700)
     if st.button("💾 GUARDAR CAMBIOS (VISTA FULL)", type="primary"):
         conn = sqlite3.connect('leads.db')
         for _, row in edited_df.iterrows(): conn.execute("UPDATE leads SET estado = ?, notas = ? WHERE id = ?", (row['estado'], row['notas'], row['id']))
         conn.commit(); conn.close(); st.rerun()
 
-# --- ENGINE ---
+# --- ZONA DE GESTIÓN DE DATOS (AL FINAL) ---
+st.divider()
+exp_c1, exp_c2 = st.columns([0.7, 0.3])
+with exp_c1:
+    st.download_button("📥 DESCARGAR BASE DE DATOS COMPLETA (CSV)", df_all.to_csv(index=False, encoding='utf-8-sig'), f"leads_pro_{datetime.datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
+with exp_c2:
+    with st.expander("⚙️ ADMINISTRAR DB"):
+        if st.button("🗑️ BORRAR TODO", use_container_width=True):
+            if st.session_state.get('confirm_del', False):
+                conn = sqlite3.connect('leads.db')
+                conn.execute("DELETE FROM leads")
+                conn.commit(); conn.close()
+                st.session_state.confirm_del = False
+                st.success("Base de datos reseteada.")
+                time.sleep(1); st.rerun()
+            else:
+                st.warning("¿Confirmas el borrado?")
+                st.session_state.confirm_del = True
+
+    # --- ENGINE ---
 async def scrape_zone(context, query, max_results, city, country, nicho_val, infinito, modo_escaneo, log_area, live_counter):
     page = await context.new_page()
     found, audited = 0, 0
@@ -252,7 +317,6 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                 if ("Caza-Sitios" in modo_escaneo and tiene_w) or ("SEO Audit" in modo_escaneo and not tiene_w):
                     log_area.write(f"⏭️ Saltado: {name}"); continue
                 
-                # GPS
                 lat, lng = None, None
                 for _ in range(10):
                     m = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", page.url)
@@ -260,7 +324,6 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                     if m: lat, lng = float(m.group(1)), float(m.group(2)); break
                     await asyncio.sleep(0.5)
                 
-                # Data
                 p_el = await page.query_selector('button[data-item-id^="phone:tel:"]')
                 phone = await p_el.inner_text() if p_el else "N/A"
                 
@@ -269,7 +332,6 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                 if r_el:
                     m_r = re.search(r"(\d[,\.]\d)", await r_el.get_attribute("aria-label"))
                     if m_r: r_num = f"{m_r.group(1).replace(',', '.')} / 5"
-                
                 rev_el = await page.query_selector("span[aria-label*='reseñas'], span[aria-label*='opiniones']")
                 if rev_el: rev_num = "".join(filter(str.isdigit, await rev_el.get_attribute("aria-label"))) or "0"
                 
@@ -278,7 +340,7 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
 
                 save_lead({"Nombre": name, "Teléfono": phone, "Rating": r_num, "Reseñas": rev_num, "Tipo": tipo_txt, "Lat": lat, "Lng": lng, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val, "Web": w_url})
                 found += 1; st.session_state.total_session += 1
-                live_counter.markdown(f"<div style='background:#111; border:2px solid #39FF14; border-radius:15px; padding:15px; text-align:center;'><h1 style='margin:0; color:#39FF14;'>{st.session_state.total_session} LEADS</h1></div>", unsafe_allow_html=True)
+                live_counter.markdown(f"<div style='background:#111;border:2px solid #39FF14;border-radius:15px;padding:15px;text-align:center'><h1 style='margin:0;color:#39FF14'>{st.session_state.total_session} LEADS</h1></div>", unsafe_allow_html=True)
                 log_area.write(f"✅ CAPTURADO: {name}")
             except: continue
     finally: await page.close(); return found
@@ -294,19 +356,17 @@ async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito, modo_esca
         elif n.startswith("SECTOR_"):
             search_list = [x for x in NICHOS_DICT[n.replace("SECTOR_","")] if "TODOS LOS" not in x]
         else: search_list = [n]
-        
         leads_sesion = 0
-        for barrio in barrios_list:
+        for b in barrios_list:
             if st.session_state.stop_requested: break
-            for nicho_item in search_list:
+            for ni in search_list:
                 if st.session_state.stop_requested: break
-                query = f"{nicho_item} en {barrio}, {city_base}, {p}" if barrio else f"{nicho_item} en {city_base}, {p}"
-                leads_sesion += await scrape_zone(context, query, max_r, city_base, p, nicho_item, infinito, modo_escaneo, log_area, live_counter)
+                query = f"{ni} en {b}, {city_base}, {p}" if b else f"{ni} en {city_base}, {p}"
+                st.toast(f"🔎: {ni}"); leads_sesion += await scrape_zone(context, query, max_r, city_base, p, ni, infinito, modo_escaneo, log_area, live_counter)
         await browser.close(); st.session_state.last_summary = {'leads': leads_sesion}
 
 if start_btn:
     st.session_state.last_summary = None; st.session_state.stop_requested = False; st.session_state.total_session = 0
     live_c = log_container.empty()
-    with st.expander("📄 Logs de Operación", expanded=False):
-        asyncio.run(main_loop(nicho, ciudad_base, pais, barrios, max_res, ver_nav, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
+    with st.expander("📄 Logs", expanded=False): asyncio.run(main_loop(nicho, ciudad_base, pais_sel, barrios, max_res, ver_nav, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
     st.rerun()
