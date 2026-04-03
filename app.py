@@ -10,64 +10,33 @@ from geo_data import GEO_DATA
 import time
 
 # --- INITIALIZE STATE ---
-if 'running' not in st.session_state:
-    st.session_state.running = False
-if 'last_summary' not in st.session_state:
-    st.session_state.last_summary = None
-if 'stop_requested' not in st.session_state:
-    st.session_state.stop_requested = False
+if 'stop_requested' not in st.session_state: st.session_state.stop_requested = False
+if 'total_session' not in st.session_state: st.session_state.total_session = 0
+if 'last_summary' not in st.session_state: st.session_state.last_summary = None
 
 # --- DATABASE ---
 def init_db():
     conn = sqlite3.connect('leads.db', check_same_thread=False)
     conn.execute('''CREATE TABLE IF NOT EXISTS leads (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        nombre TEXT UNIQUE, 
-        telefono TEXT, 
-        rating TEXT, 
-        reseñas TEXT,
-        tipo TEXT,
-        lat REAL,
-        lng REAL,
-        zona TEXT, 
-        ciudad TEXT, 
-        pais TEXT, 
-        nicho TEXT, 
-        fecha TEXT,
-        web TEXT,
-        estado TEXT DEFAULT 'Nuevo',
-        notas TEXT)''')
-    
-    cols = [
-        ("lat", "REAL"), ("lng", "REAL"), ("reseñas", "TEXT"), 
-        ("tipo", "TEXT"), ("zona", "TEXT"), ("ciudad", "TEXT"), 
-        ("pais", "TEXT"), ("nicho", "TEXT"), ("fecha", "TEXT"),
-        ("web", "TEXT"), ("estado", "TEXT"), ("notas", "TEXT")
-    ]
-    cursor = conn.execute("PRAGMA table_info(leads)")
-    existing_cols = [row[1] for row in cursor.fetchall()]
-    for col_name, col_type in cols:
-        if col_name not in existing_cols:
-            try:
-                default = " DEFAULT 'Nuevo'" if col_name == "estado" else ""
-                conn.execute(f"ALTER TABLE leads ADD COLUMN {col_name} {col_type}{default}")
-            except: pass
-    conn.commit()
-    conn.close()
+        nombre TEXT UNIQUE, telefono TEXT, rating TEXT, reseñas TEXT,
+        tipo TEXT, lat REAL, lng REAL, zona TEXT, ciudad TEXT, pais TEXT, 
+        nicho TEXT, fecha TEXT, web TEXT, estado TEXT DEFAULT 'Nuevo', notas TEXT)''')
+    conn.commit(); conn.close()
 
 def save_lead(lead):
     conn = sqlite3.connect('leads.db', check_same_thread=False)
     try:
         conn.execute('''INSERT OR IGNORE INTO leads (nombre, telefono, rating, reseñas, tipo, lat, lng, zona, ciudad, pais, nicho, fecha, web)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-            (lead['Nombre'], lead['Teléfono'], lead['Rating'], lead['Reseñas'], lead['Tipo'], lead.get('Lat'), lead.get('Lng'), lead['Zona'], lead['Ciudad'], lead['Pais'], lead['Nicho'], datetime.datetime.now().strftime("%Y-%m-%d"), lead.get('Web')))
+            (lead['Nombre'], lead['Teléfono'], lead['Rating'], lead['Reseñas'], lead['Tipo'], lead.get('Lat'), lead.get('Lng'), lead['Zona'], lead['Ciudad'], lead['Pais'], lead['Nicho'], lead.get('Fecha', datetime.datetime.now().strftime("%Y-%m-%d")), lead.get('Web')))
         conn.commit()
     finally: conn.close()
 
 init_db()
 
 # --- INTERFACE CONFIG ---
-st.set_page_config(page_title="Lead Gen Pro | Elite Dashboard", layout="wide", page_icon="🟢")
+st.set_page_config(page_title="Lead Gen Pro | Elite Suite", layout="wide", page_icon="🟢")
 
 # --- CYBER CSS ---
 st.markdown("""
@@ -75,19 +44,27 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
     .stApp { background-color: #0a0a0a; font-family: 'Inter', sans-serif; color: #ffffff; }
     .neon-text { color: #39FF14; text-shadow: 0 0 8px rgba(57, 255, 20, 0.3); font-weight: 800; }
-    [data-testid="stSidebar"] { min-width: 320px !important; }
+    [data-testid="stSidebar"] { min-width: 320px !important; border-right: 1px solid #222; }
     [data-testid="stExpander"] { background-color: #1a1a1a !important; border: 1px solid #333 !important; border-radius: 10px !important; }
     .stButton>button { width: 100% !important; background: #111111 !important; color: #39FF14 !important; border: 1px solid #39FF14 !important; border-radius: 8px !important; font-weight: 700 !important; }
     .stButton>button:hover { background: #39FF14 !important; color: #000000 !important; box-shadow: 0 0 15px rgba(57, 255, 20, 0.4) !important; }
     div[data-testid="stMetric"] { background: #161616; border-radius: 12px; padding: 10px !important; border: 1px solid #252525; }
+    /* Ajuste para pantalla completa */
+    .main .block-container { padding-top: 2rem; padding-bottom: 1rem; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR CONTROLS ---
+# --- UTILS ---
+def get_wa_link(row):
+    p = "".join(filter(str.isdigit, str(row['telefono'])))
+    if not p or len(p) < 7: return "#"
+    msg = f"Hola {row['nombre']}, vi tu negocio de {row['tipo']} en Google Maps. Tienes una puntuación de {row['rating']} y me gustaría comentarte algo sobre tu presencia online. ¿Hablamos?"
+    return f"https://wa.me/{p}?text={urllib.parse.quote(msg)}"
+
+# --- SIDEBAR ---
 with st.sidebar:
     st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND</h2>", unsafe_allow_html=True)
     st.divider()
-    
     modo_escaneo = st.selectbox("MODO DE ESCANEO:", ["🎯 Caza-Sitios (Solo SIN web)", "📈 SEO Audit (Solo CON web)", "🔎 Full Scan (Todo)"])
     
     with st.expander("🌐 GEOLOCALIZACIÓN", expanded=True):
@@ -97,134 +74,159 @@ with st.sidebar:
         st.divider()
         tipo_zona = st.radio("COBERTURA:", ["📍 TODA LA CIUDAD", "📍 CENTRO", "⬆️ NORTE", "⬇️ SUR", "🧩 BARRIOS"])
         barrios = st.text_area("LISTA DE BARRIOS:", "Zona Centro").split("\n") if tipo_zona == "🧩 BARRIOS" else ([tipo_zona.replace("📍 ","").replace("⬆️ ","").replace("⬇️ ","")] if tipo_zona != "📍 TODA LA CIUDAD" else [""])
-
+    
     with st.expander("🎯 NICHO Y SECTOR", expanded=True):
         NICHOS_DICT = {
             "🌎 TODOS": ["Todos los Negocios (General)"],
-            "🏥 SALUD & BIENESTAR": ["TODOS LOS SUBNICHOS (Sector Salud)", "Odontólogos", "Psicólogos", "Fisioterapeutas", "Ópticas", "Clínicas Médicas", "Farmacias", "Laboratorios", "Podólogos", "Ginecólogos", "Dermatólogos", "Nutricionistas", "Veterinarias"],
-            "🍽️ GASTRONOMÍA": ["TODOS LOS SUBNICHOS (Sector Gastronomía)", "Restaurantes", "Cafeterías", "Pizzerías", "Hamburgueserías", "Panaderías", "Bares", "Sushi", "Comida Vegana", "Heladerías", "Catering"],
-            "🚗 AUTOMOTRIZ": ["TODOS LOS SUBNICHOS (Sector Motor)", "Talleres Mecánicos", "Concesionarios", "Lavado de Autos (Spa)", "Venta de Repuestos", "Llantas", "Alquiler de Vehículos", "Centros de Diagnóstico", "Tapicería"],
-            "🏠 HOGAR & CONSTRUCCIÓN": ["TODOS LOS SUBNICHOS (Sector Hogar)", "Inmobiliarias", "Reformas", "Pintores", "Cerrajeros", "Electricistas", "Fontaneros", "Carpinterías", "Mueblerías", "Arquitectos", "Constructoras"],
-            "💄 BELLEZA & CUIDADO": ["TODOS LOS SUBNICHOS (Sector Belleza)", "Peluquerías", "Barberías", "Spas", "Centros de Uñas", "Estética Facial", "Tatuajes", "Gimnasios", "Crossfit", "Yoga"],
-            "⚖️ LEGAL & FINANCIERO": ["TODOS LOS SUBNICHOS (Sector Profesional)", "Abogados", "Contadores", "Notarías", "Asesores Fiscales", "Agencias de Seguros", "Casas de Cambio", "Consultoría Empresarial"],
-            "🎓 EDUCACIÓN": ["TODOS LOS SUBNICHOS (Sector Educación)", "Academias de Idiomas", "Jardines Infantiles", "Colegios", "Escuelas de Conducción", "Tutorías", "Academias de Música"],
-            "💻 TECNOLOGÍA": ["TODOS LOS SUBNICHOS (Sector Tech)", "Reparación de Celulares", "Soporte Técnico PC", "Agencias de Marketing", "Desarrollo de Software", "Cámaras de Seguridad"],
-            "🎉 EVENTOS & TURISMO": ["TODOS LOS SUBNICHOS (Sector Turismo)", "Salones de Eventos", "Fotógrafos", "Agencias de Viajes", "Hoteles", "Discotecas", "Parques de Diversiones"]
+            "🏥 SALUD": ["TODOS LOS SUBNICHOS (Sector Salud)", "Odontólogos", "Clínicas", "Ópticas", "Psicólogos"],
+            "🍽️ GASTRO": ["TODOS LOS SUBNICHOS (Sector Gastro)", "Restaurantes", "Cafés", "Pizzerías"],
+            "🚗 MOTOR": ["TODOS LOS SUBNICHOS (Sector Motor)", "Talleres", "Repuestos", "Lavaderos"],
+            "💄 BELLEZA": ["TODOS LOS SUBNICHOS (Sector Belleza)", "Peluquerías", "Spas", "Estética"],
+            "⚖️ PROFESIONAL": ["TODOS LOS SUBNICHOS (Sector Prof)", "Abogados", "Contadores", "Notarías"]
         }
-        
-        cat_sel = st.selectbox("CATEGORÍA:", list(NICHOS_DICT.keys()))
-        sub_sel = st.selectbox("NICHO ESPECÍFICO:", NICHOS_DICT[cat_sel])
-        
-        exhaustivo = st.toggle("🚀 MODO EXHAUSTIVO TOTAL (+150 Nichos)", False)
-        
-        if exhaustivo:
-            nicho = "MODO_EXHAUSTIVO_TOTAL"
-            st.info("⚠️ Buscará en TODOS los nichos del sistema uno por uno.")
-        elif "TODOS LOS SUBNICHOS" in sub_sel:
-            nicho = f"SECTOR_{cat_sel}"
-            st.info(f"📂 Barrido completo del sector: {cat_sel}")
-        else:
-            nicho = sub_sel
-
+        cat = st.selectbox("CATEGORÍA:", list(NICHOS_DICT.keys()))
+        sub = st.selectbox("NICHO:", NICHOS_DICT[cat])
+        exhaustivo = st.toggle("🚀 MODO EXHAUSTIVO TOTAL", False)
+        nicho = "MODO_EXHAUSTIVO_TOTAL" if exhaustivo else (f"SECTOR_{cat}" if "TODOS LOS" in sub else sub)
+    
     max_res = st.number_input("CAPACIDAD:", 5, 5000, 50)
     infinito = st.toggle("♾️ ILIMITADO", False)
     ver_nav = st.checkbox("👁️ VER BROWSER", False)
     
     st.divider()
-    col_b1, col_btn2 = st.columns(2)
-    with col_b1: start_btn = st.button("🚀 INICIAR", type="primary")
-    with col_btn2: stop_btn = st.button("🛑 PARAR")
+    c1, c2 = st.columns(2)
+    start_btn = c1.button("🚀 INICIAR", type="primary")
+    stop_btn = c2.button("🛑 PARAR")
     if stop_btn: st.session_state.stop_requested = True
 
-# --- MAIN DASHBOARD ---
-st.markdown("<h1 style='font-size: 2.5em; margin-bottom:0;'>LEAD GEN <span class='neon-text'>PRO ELITE</span></h1>", unsafe_allow_html=True)
+# --- DASHBOARD HEADER ---
+st.markdown("<h1 style='font-size: 2.2em; margin-bottom:0;'>LEAD GEN <span class='neon-text'>PRO ELITE</span></h1>", unsafe_allow_html=True)
 
-# 1. UNIFIED METRICS ROW
 conn = sqlite3.connect('leads.db')
 df_all = pd.read_sql_query("SELECT * FROM leads", conn)
 conn.close()
 
-m_col1, m_col2, m_col3, m_col4, m_col5, m_col6 = st.columns(6)
-m_col1.metric("🎯 OBJETIVO", "∞" if infinito else max_res)
-m_col2.metric("🆕 NUEVOS", len(df_all[df_all['estado'] == 'Nuevo']))
-m_col3.metric("📲 CONTACTO", len(df_all[df_all['estado'] == 'Contactado']))
-m_col4.metric("🔥 INTERÉS", len(df_all[df_all['estado'] == 'Interesado']))
-m_col5.metric("💰 CIERRES", len(df_all[df_all['estado'] == 'Cerrado']))
-m_col6.metric("🌍 TOTAL", len(df_all))
-
-# 2. LIVE SCANNER LOGS (Only visible when running or after summary)
-if st.session_state.last_summary:
-    st.success(f"🔥 Operación finalizada: {st.session_state.last_summary['leads']} capturados.")
-    if st.button("Limpiar"): st.session_state.last_summary = None; st.rerun()
+# Métricas rápidas
+m1, m2, m3, m4, m5, m6 = st.columns(6)
+m1.metric("🎯 OBJETIVO", "∞" if infinito else max_res)
+m2.metric("🆕 NUEVOS", len(df_all[df_all['estado'] == 'Nuevo']))
+m3.metric("📲 CONTACTO", len(df_all[df_all['estado'] == 'Contactado']))
+m4.metric("🔥 INTERÉS", len(df_all[df_all['estado'] == 'Interesado']))
+m5.metric("💰 CIERRES", len(df_all[df_all['estado'] == 'Cerrado']))
+m6.metric("🌍 TOTAL", len(df_all))
 
 log_container = st.empty()
+if st.session_state.last_summary:
+    st.success(f"🔥 Operación finalizada: {st.session_state.last_summary['leads']} capturados.")
+    if st.button("Cerrar resumen"): st.session_state.last_summary = None; st.rerun()
 
-# 3. MAP & CRM SECTION (THE CORE)
+# --- SELECTOR DE VISTA ---
 st.divider()
-col_left, col_right = st.columns([0.45, 0.55])
+view_mode = st.radio("💎 SELECCIONAR VISTA DE TRABAJO:", ["🌓 VISTA DIVIDIDA", "🗺️ MAPA TOTAL", "📝 GESTIÓN TOTAL (CRM)"], horizontal=True)
 
-with col_left:
-    st.markdown("#### 🗺️ Mapa de Inteligencia en Tiempo Real")
-    map_data = df_all.dropna(subset=['lat', 'lng']).copy()
+# --- FILTROS GLOBALES DEL CRM ---
+with st.expander("🔍 FILTRAR BASE DE DATOS POR CATEGORÍAS", expanded=False):
+    f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+    with f_col1:
+        nicho_f = st.multiselect("Nicho de Búsqueda:", options=df_all['nicho'].unique(), default=[])
+    with f_col2:
+        tipo_f = st.multiselect("Categoría Real (Maps):", options=df_all['tipo'].unique(), default=[])
+    with f_col3:
+        ciudad_f = st.multiselect("Ciudad:", options=df_all['ciudad'].unique(), default=[])
+    with f_col4:
+        estado_f = st.multiselect("Status:", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"], default=[])
+    
+    search_txt = st.text_input("🎯 Buscar por nombre o notas:", placeholder="Escribe para filtrar...")
+
+# Aplicar Filtros
+df_filtered = df_all.copy()
+if nicho_f: df_filtered = df_filtered[df_filtered['nicho'].isin(nicho_f)]
+if tipo_f: df_filtered = df_filtered[df_filtered['tipo'].isin(tipo_f)]
+if ciudad_f: df_filtered = df_filtered[df_filtered['ciudad'].isin(ciudad_f)]
+if estado_f: df_filtered = df_filtered[df_filtered['estado'].isin(estado_f)]
+if search_txt:
+    df_filtered = df_filtered[
+        df_filtered['nombre'].str.contains(search_txt, case=False, na=False) | 
+        df_filtered['notas'].str.contains(search_txt, case=False, na=False)
+    ]
+
+# Preparar datos finales
+df_edit = df_filtered.copy().sort_values(by='id', ascending=False)
+df_edit['Chat'] = df_edit.apply(get_wa_link, axis=1)
+
+# Lógica de Visualización
+if view_mode == "🌓 VISTA DIVIDIDA":
+    col_l, col_r = st.columns([0.45, 0.55])
+    with col_l:
+        st.markdown("#### 🗺️ Mapa Intel")
+        map_data = df_filtered.dropna(subset=['lat', 'lng']).copy()
+        if not map_data.empty:
+            import folium
+            from streamlit_folium import st_folium
+            m = folium.Map(location=[map_data["lat"].mean(), map_data["lng"].mean()], zoom_start=12, tiles="CartoDB dark_matter")
+            for _, row in map_data.iterrows():
+                colors = {"Nuevo": "#39FF14", "Contactado": "#FFD700", "Interesado": "#FF8C00", "Cerrado": "#00FF00", "Descartado": "#808080"}
+                c = colors.get(row['estado'], "#39FF14")
+                wa = get_wa_link(row)
+                popup = f"<b>{row['nombre']}</b><br>⭐ {row['rating']}<br><a href='{wa}' target='_blank'>Contactar 📲</a>"
+                folium.CircleMarker([row['lat'], row['lng']], radius=9, color=c, fill=True, popup=folium.Popup(popup, max_width=250)).add_to(m)
+            st_folium(m, width=None, height=500, key="split_map")
+    with col_r:
+        st.markdown(f"#### 📝 Gestión CRM ({len(df_filtered)} leads)")
+        edited_df = st.data_editor(
+            df_edit[['id', 'estado', 'notas', 'nombre', 'rating', 'Chat', 'tipo']],
+            column_config={"estado": st.column_config.SelectboxColumn("Status", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]), "Chat": st.column_config.LinkColumn("Chat 📲"), "id": None},
+            disabled=["nombre", "rating", "Chat", "tipo"], hide_index=True, width="stretch", height=500
+        )
+        if st.button("💾 GUARDAR CRM", type="primary"):
+            conn = sqlite3.connect('leads.db')
+            for _, row in edited_df.iterrows(): conn.execute("UPDATE leads SET estado = ?, notas = ? WHERE id = ?", (row['estado'], row['notas'], row['id']))
+            conn.commit(); conn.close(); st.rerun()
+
+elif view_mode == "🗺️ MAPA TOTAL":
+    st.markdown(f"#### 🗺️ NAVEGACIÓN COMPLETA ({len(df_filtered)} leads)")
+    map_data = df_filtered.dropna(subset=['lat', 'lng']).copy()
     if not map_data.empty:
         import folium
         from streamlit_folium import st_folium
-        m = folium.Map(location=[map_data["lat"].mean(), map_data["lng"].mean()], zoom_start=12, tiles="CartoDB dark_matter")
+        m = folium.Map(location=[map_data["lat"].mean(), map_data["lng"].mean()], zoom_start=13, tiles="CartoDB dark_matter")
         for _, row in map_data.iterrows():
             colors = {"Nuevo": "#39FF14", "Contactado": "#FFD700", "Interesado": "#FF8C00", "Cerrado": "#00FF00", "Descartado": "#808080"}
             c = colors.get(row['estado'], "#39FF14")
-            wa = f"https://wa.me/{''.join(filter(str.isdigit, str(row['telefono'])))}"
-            popup = f"<b>{row['nombre']}</b><br>Rating: {row['rating']}<br>Status: {row['estado']}<br><a href='{wa}' target='_blank'>WhatsApp 📲</a>"
-            folium.CircleMarker([row['lat'], row['lng']], radius=8, color=c, fill=True, fill_opacity=0.8, popup=folium.Popup(popup, max_width=300)).add_to(m)
-        st_folium(m, width=None, height=550, key="main_intel_map")
-    else: st.info("Mapa esperando datos...")
+            wa = get_wa_link(row)
+            popup = f"<div style='min-width:200px'><b>{row['nombre']}</b><br>⭐ {row['rating']} ({row['reseñas']})<br>🏷️ {row['tipo']}<br><hr><a href='{wa}' target='_blank' style='background:#25D366;color:white;padding:5px;display:block;text-align:center;text-decoration:none;border-radius:5px'>CONTACTAR WHATSAPP</a></div>"
+            folium.CircleMarker([row['lat'], row['lng']], radius=12, color=c, fill=True, popup=folium.Popup(popup, max_width=300)).add_to(m)
+        st_folium(m, width=None, height=750, key="full_map")
 
-with col_right:
-    st.markdown("#### 📝 Centro de Gestión CRM")
-    if not df_all.empty:
-        # Link Gen
-        df_edit = df_all.copy().sort_values(by='id', ascending=False)
-        def get_wa(row):
-            p = "".join(filter(str.isdigit, str(row['telefono'])))
-            if not p or len(p) < 7: return "N/A"
-            msg = f"Hola {row['nombre']}, vi tu perfil en Maps. Tienes {row['rating']} estrellas pero no tienes tu web oficial. ¿Te ayudo?"
-            return f"https://wa.me/{p}?text={urllib.parse.quote(msg)}"
-        df_edit['Chat'] = df_edit.apply(get_wa, axis=1)
+elif view_mode == "📝 GESTIÓN TOTAL (CRM)":
+    st.markdown(f"#### 📝 PANEL DE CONTROL ({len(df_filtered)} leads)")
+    edited_df = st.data_editor(
+        df_edit[['id', 'estado', 'notas', 'nombre', 'rating', 'reseñas', 'tipo', 'Chat', 'web', 'nicho', 'fecha', 'ciudad']],
+        column_config={
+            "estado": st.column_config.SelectboxColumn("Status", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]),
+            "Chat": st.column_config.LinkColumn("WhatsApp 📲"),
+            "web": st.column_config.LinkColumn("Sitio Web"),
+            "id": None,
+            "rating": st.column_config.TextColumn("⭐"),
+            "tipo": st.column_config.TextColumn("Categoría"),
+            "fecha": st.column_config.TextColumn("Capturado")
+        },
+        disabled=["nombre", "rating", "reseñas", "tipo", "Chat", "web", "nicho", "fecha", "ciudad"],
+        hide_index=True, width="stretch", height=700
+    )
+    if st.button("💾 GUARDAR CAMBIOS (VISTA FULL)", type="primary"):
+        conn = sqlite3.connect('leads.db')
+        for _, row in edited_df.iterrows(): conn.execute("UPDATE leads SET estado = ?, notas = ? WHERE id = ?", (row['estado'], row['notas'], row['id']))
+        conn.commit(); conn.close(); st.rerun()
 
-        edited_df = st.data_editor(
-            df_edit[['id', 'estado', 'notas', 'nombre', 'web', 'Chat', 'rating', 'ciudad']],
-            column_config={
-                "estado": st.column_config.SelectboxColumn("Status", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"], width="small"),
-                "Chat": st.column_config.LinkColumn("WhatsApp 📲", width="small"),
-                "web": st.column_config.LinkColumn("Web", width="small"),
-                "id": None
-            },
-            disabled=["nombre", "web", "Chat", "rating", "ciudad"],
-            hide_index=True, width="stretch", height=450
-        )
-        if st.button("💾 GUARDAR CAMBIOS CRM", type="primary"):
-            conn = sqlite3.connect('leads.db')
-            for _, row in edited_df.iterrows():
-                conn.execute("UPDATE leads SET estado = ?, notas = ? WHERE id = ?", (row['estado'], row['notas'], row['id']))
-            conn.commit(); conn.close()
-            st.success("¡Datos guardados!"); time.sleep(1); st.rerun()
-        
-        with st.expander("⚙️ EXPORTAR / BORRAR"):
-            st.download_button("📥 Descargar CSV", df_all.to_csv(index=False), "leads_export.csv")
-            if st.button("🗑️ RESETEAR BASE DE DATOS"):
-                conn = sqlite3.connect('leads.db'); conn.execute("DELETE FROM leads"); conn.commit(); conn.close(); st.rerun()
-    else: st.info("CRM esperando leads...")
-
-# --- ENGINE INJECTION ---
-async def scrape_zone(context, query, max_results, city, country, nicho_val, infinito, modo_escaneo, log_area):
+# --- ENGINE ---
+async def scrape_zone(context, query, max_results, city, country, nicho_val, infinito, modo_escaneo, log_area, live_counter):
     page = await context.new_page()
-    found = 0
-    audited = 0
+    found, audited = 0, 0
     try:
         await page.goto(f"https://www.google.com/maps/search/{urllib.parse.quote(query)}/?hl=es", wait_until="domcontentloaded", timeout=60000)
         try: await page.click('button:has-text("Aceptar")', timeout=3000)
         except: pass
-        
         while (infinito or found < max_results) and not st.session_state.stop_requested:
             items = await page.query_selector_all("a.hfpxzc")
             if audited >= len(items):
@@ -234,7 +236,6 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                     if len(await page.query_selector_all("a.hfpxzc")) == len(items): break
                     continue
                 else: break
-
             item = items[audited]; audited += 1
             try:
                 name = await item.get_attribute("aria-label")
@@ -244,69 +245,68 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                 except: await item.evaluate("el => el.click()")
                 try: await page.wait_for_selector("h1.DUwDvf", timeout=5000)
                 except: continue
-
+                
                 w_btn = await page.query_selector("a[data-item-id='authority']")
                 w_url = await w_btn.get_attribute("href") if w_btn else "Sin sitio web"
                 tiene_w = w_url != "Sin sitio web"
-                
                 if ("Caza-Sitios" in modo_escaneo and tiene_w) or ("SEO Audit" in modo_escaneo and not tiene_w):
-                    log_area.write(f"⏭️ Saltado: {name} (Filtro)"); continue
-
+                    log_area.write(f"⏭️ Saltado: {name}"); continue
+                
+                # GPS
                 lat, lng = None, None
-                for _ in range(5):
-                    match = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", page.url)
-                    if not match: match = re.search(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)", page.url)
-                    if match: lat, lng = float(match.group(1)), float(match.group(2)); break
+                for _ in range(10):
+                    m = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", page.url)
+                    if not m: m = re.search(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)", page.url)
+                    if m: lat, lng = float(m.group(1)), float(m.group(2)); break
                     await asyncio.sleep(0.5)
-
+                
+                # Data
                 p_el = await page.query_selector('button[data-item-id^="phone:tel:"]')
                 phone = await p_el.inner_text() if p_el else "N/A"
                 
-                r_num = "N/A"
+                r_num, rev_num = "N/A", "0"
                 r_el = await page.query_selector("span[aria-label*='estrellas']")
                 if r_el:
                     m_r = re.search(r"(\d[,\.]\d)", await r_el.get_attribute("aria-label"))
                     if m_r: r_num = f"{m_r.group(1).replace(',', '.')} / 5"
                 
-                save_lead({"Nombre": name, "Teléfono": phone, "Rating": r_num, "Reseñas": "S/D", "Tipo": "N/A", "Lat": lat, "Lng": lng, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val, "Web": w_url})
-                found += 1; log_area.write(f"✅ CAPTURADO: {name}")
+                rev_el = await page.query_selector("span[aria-label*='reseñas'], span[aria-label*='opiniones']")
+                if rev_el: rev_num = "".join(filter(str.isdigit, await rev_el.get_attribute("aria-label"))) or "0"
+                
+                tipo_el = await page.query_selector('button[class="Dener"]')
+                tipo_txt = await tipo_el.inner_text() if tipo_el else nicho_val
+
+                save_lead({"Nombre": name, "Teléfono": phone, "Rating": r_num, "Reseñas": rev_num, "Tipo": tipo_txt, "Lat": lat, "Lng": lng, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val, "Web": w_url})
+                found += 1; st.session_state.total_session += 1
+                live_counter.markdown(f"<div style='background:#111; border:2px solid #39FF14; border-radius:15px; padding:15px; text-align:center;'><h1 style='margin:0; color:#39FF14;'>{st.session_state.total_session} LEADS</h1></div>", unsafe_allow_html=True)
+                log_area.write(f"✅ CAPTURADO: {name}")
             except: continue
     finally: await page.close(); return found
 
-async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito, modo_escaneo, log_area, NICHOS_DICT):
+async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito, modo_escaneo, log_area, NICHOS_DICT, live_counter):
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=not v)
         context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        
-        leads_sesion = 0
-        
-        # PREPARAR LISTA DE BÚSQUEDA SEGÚN EL MODO
+        search_list = []
         if n == "MODO_EXHAUSTIVO_TOTAL":
-            search_list = []
-            for sub in NICHOS_DICT.values():
-                search_list.extend([x for x in sub if "TODOS LOS SUBNICHOS" not in x])
+            for sub in NICHOS_DICT.values(): search_list.extend([x for x in sub if "TODOS LOS" not in x])
             search_list = sorted(list(set(search_list)))
         elif n.startswith("SECTOR_"):
-            sector_name = n.replace("SECTOR_", "")
-            search_list = [x for x in NICHOS_DICT[sector_name] if "TODOS LOS SUBNICHOS" not in x]
-        elif n == "Todos los Negocios (General)":
-            search_list = ["tiendas", "restaurantes", "oficinas", "servicios", "talleres", "clinicas", "negocios locales"]
-        else:
-            search_list = [n]
-
+            search_list = [x for x in NICHOS_DICT[n.replace("SECTOR_","")] if "TODOS LOS" not in x]
+        else: search_list = [n]
+        
+        leads_sesion = 0
         for barrio in barrios_list:
             if st.session_state.stop_requested: break
             for nicho_item in search_list:
                 if st.session_state.stop_requested: break
                 query = f"{nicho_item} en {barrio}, {city_base}, {p}" if barrio else f"{nicho_item} en {city_base}, {p}"
-                st.toast(f"🔎 Analizando: {nicho_item}")
-                leads_sesion += await scrape_zone(context, query, max_r, city_base, p, nicho_item, infinito, modo_escaneo, log_area)
-        
-        await browser.close()
-        st.session_state.last_summary = {'leads': leads_sesion}
+                leads_sesion += await scrape_zone(context, query, max_r, city_base, p, nicho_item, infinito, modo_escaneo, log_area, live_counter)
+        await browser.close(); st.session_state.last_summary = {'leads': leads_sesion}
 
 if start_btn:
-    st.session_state.last_summary = None; st.session_state.stop_requested = False
-    with log_container.expander("📄 Registro de Actividad en Vivo", expanded=True):
-        asyncio.run(main_loop(nicho, ciudad_base, pais, barrios, max_res, ver_nav, infinito, modo_escaneo, st, NICHOS_DICT))
+    st.session_state.last_summary = None; st.session_state.stop_requested = False; st.session_state.total_session = 0
+    live_c = log_container.empty()
+    with st.expander("📄 Logs de Operación", expanded=False):
+        asyncio.run(main_loop(nicho, ciudad_base, pais, barrios, max_res, ver_nav, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
     st.rerun()
