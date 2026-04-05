@@ -21,7 +21,6 @@ echo ===============================================
 pyinstaller --noconfirm --onefile --windowed ^
     --add-data "app.py;." ^
     --add-data "geo_data.py;." ^
-    --add-data "leads.db;." ^
     --collect-all streamlit ^
     --collect-all playwright ^
     --name "LeadGenPro_Elite" ^
