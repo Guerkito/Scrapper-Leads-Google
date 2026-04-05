@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Windows Setup
 
 on:
   release:
@@ -28,20 +28,25 @@ jobs:
       run: |
         python -m playwright install chromium
 
-    - name: Build with PyInstaller
+    - name: Build with PyInstaller (OneDir mode)
       run: |
-        pyinstaller --noconfirm --onefile --windowed --add-data "app.py;." --add-data "geo_data.py;." --collect-all streamlit --collect-all playwright --name "LeadGenPro_Elite" lanzador_windows.py
+        pyinstaller --noconfirm --onedir --windowed --add-data "app.py;." --add-data "geo_data.py;." --collect-all streamlit --collect-all playwright --name "LeadGenPro_Elite" lanzador_windows.py
 
-    - name: Upload artifact
+    - name: Compile Inno Setup Installer
+      uses: a7ul/innosetup-action@v1
+      with:
+        filepath: installer.iss
+
+    - name: Upload Setup Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: LeadGenPro_Elite_Windows
-        path: dist/LeadGenPro_Elite.exe
+        name: LeadGenPro_Elite_Setup
+        path: dist/LeadGenPro_Elite_Setup.exe
 
     - name: Upload to Release
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/LeadGenPro_Elite.exe
+        files: dist/LeadGenPro_Elite_Setup.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
