@@ -33,9 +33,9 @@ jobs:
         pyinstaller --noconfirm --onedir --windowed --add-data "app.py;." --add-data "geo_data.py;." --collect-all streamlit --collect-all playwright --name "LeadGenPro_Elite" lanzador_windows.py
 
     - name: Compile Inno Setup Installer
-      uses: a7ul/innosetup-action@v1
-      with:
-        filepath: installer.iss
+      run: |
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+      shell: powershell
 
     - name: Upload Setup Artifact
       uses: actions/upload-artifact@v4
