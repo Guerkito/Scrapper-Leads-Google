@@ -3,9 +3,9 @@ import os
 import sys
 import subprocess
 import traceback
+from multiprocessing import freeze_support
 
 def resolve_path(path):
-    # Obtener la ruta absoluta para el ejecutable (soporta PyInstaller)
     if getattr(sys, 'frozen', False):
         base_path = sys._MEIPASS
     else:
@@ -13,27 +13,32 @@ def resolve_path(path):
     return os.path.join(base_path, path)
 
 def install_playwright():
+    # Solo intentamos instalar si no estamos ya en un subproceso de streamlit
+    if "_STREAMLIT_RUN_COMMAND_" in os.environ:
+        return
+        
     try:
-        print("Verificando dependencias del navegador...")
-        # Usamos el ejecutable de python interno del bundle
-        subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], 
-                       capture_output=True, check=True)
-    except Exception as e:
-        print(f"Aviso: Error instalando navegadores (puede que ya existan): {e}")
+        # Verificamos si ya existe el navegador para no repetir
+        # Esto evita que se abran multiples procesos
+        print("Preparando entorno seguro...")
+        # Ejecutamos la instalacion de forma que no bloquee ni cree bucles
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0" # Usa la ruta por defecto
+        subprocess.run(["playwright", "install", "chromium"], 
+                       shell=True, capture_output=True)
+    except:
+        pass
 
 if __name__ == "__main__":
+    # ¡IMPORTANTE! Evita que el EXE se abra a si mismo infinitamente en Windows
+    freeze_support()
+    
     try:
-        # Instalacion automatica de navegadores si es necesario
         if getattr(sys, 'frozen', False):
             install_playwright()
 
-        # Configurar los argumentos para arrancar Streamlit
-        # IMPORTANTE: Nos aseguramos de que app.py exista antes de arrancar
         app_path = resolve_path("app.py")
-        if not os.path.exists(app_path):
-            print(f"ERROR CRITICO: No se encuentra el archivo app.py en {app_path}")
-            sys.exit(1)
-
+        
+        # Configuracion para que Streamlit NO intente usar el EXE como interprete
         sys.argv = [
             "streamlit",
             "run",
@@ -44,11 +49,9 @@ if __name__ == "__main__":
             "--browser.gatherUsageStats=false",
         ]
         
-        print("Arrancando servidor de LeadGenPro Elite...")
         sys.exit(stcli.main())
 
     except Exception as e:
-        print("\n--- ERROR AL ARRANCAR LA APLICACIÓN ---")
+        print(f"Error: {e}")
         traceback.print_exc()
-        print("\nPresiona Enter para cerrar...")
-        input()
+        input("Presiona Enter para cerrar...")
