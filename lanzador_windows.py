@@ -3,8 +3,11 @@ import os
 import sys
 import subprocess
 import traceback
-import time
 from multiprocessing import freeze_support
+
+# Obtener la ruta del Escritorio para logs de error
+def get_desktop_path():
+    return os.path.join(os.path.expanduser("~"), "Desktop", "LEADGEN_ERROR_LOG.txt")
 
 def resolve_path(path):
     if getattr(sys, 'frozen', False):
@@ -13,37 +16,21 @@ def resolve_path(path):
         base_path = os.path.dirname(__file__)
     return os.path.join(base_path, path)
 
-def print_banner():
-    os.system('cls' if os.name == 'nt' else 'clear')
-    banner = """
-    ==========================================================
-             🚀 LEAD GEN PRO - ELITE COMMAND CENTER
-    ==========================================================
-    [ SISTEMA DE INTELIGENCIA COMERCIAL - CARGANDO... ]
-    
-    * Optimizando entorno de trabajo...
-    * Iniciando motores de scraping...
-    * Preparando panel de control...
-    
-    ----------------------------------------------------------
-    """
-    print(banner)
-
-def install_playwright():
-    # Ya no instalamos nada, usamos el Chrome del sistema
-    pass
-
 if __name__ == "__main__":
+    # ¡CRUCIAL para Windows!
     freeze_support()
     
-    try:
-        if not "_STREAMLIT_RUN_COMMAND_" in os.environ:
-            print_banner()
-            print("[!] Iniciando con el navegador del sistema...")
-            time.sleep(0.5)
+    # Si Streamlit intenta reiniciarse, interceptamos el comando
+    if len(sys.argv) > 1 and sys.argv[1] == "run":
+        # Estamos en un subproceso de Streamlit, dejamos que siga
+        stcli.main()
+        sys.exit(0)
 
+    try:
         app_path = resolve_path("app.py")
         
+        # Preparamos los argumentos de Streamlit
+        # Forzamos todo a false para evitar subprocesos innecesarios
         sys.argv = [
             "streamlit",
             "run",
@@ -52,16 +39,24 @@ if __name__ == "__main__":
             "--server.port=8501",
             "--server.headless=true",
             "--browser.gatherUsageStats=false",
-            "--theme.base=dark",
-            "--theme.primaryColor=#00FF41" # Color verde Matrix/Elite
+            "--server.fileWatcherType=none",
+            "--client.toolbarMode=hidden"
         ]
         
-        sys.exit(stcli.main())
+        print("Iniciando LeadGen Pro Elite...")
+        print("Cargando servidor interno...")
+        
+        # Arrancamos Streamlit
+        stcli.main()
 
     except Exception as e:
-        print("\n\n**********************************************************")
-        print("           ERROR CRITICO AL INICIAR")
-        print("**********************************************************")
+        # Si algo falla antes de abrir, guardamos el error en el escritorio
+        error_file = get_desktop_path()
+        with open(error_file, "w") as f:
+            f.write("--- ERROR DE ARRANQUE LEADGEN PRO ---\n")
+            traceback.print_exc(file=f)
+        
+        print(f"\nFATAL ERROR: El programa no pudo iniciar.")
+        print(f"Se ha guardado un reporte detallado en tu Escritorio: {error_file}")
         traceback.print_exc()
-        print("\nPresiona Enter para cerrar y contactar soporte...")
-        input()
+        input("\nPresiona Enter para cerrar...")
