@@ -5,3 +5,5 @@ streamlit
 pydeck
 folium
 streamlit-folium
+pyinstaller
+playwright-stealth
