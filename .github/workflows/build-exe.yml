@@ -30,7 +30,7 @@ jobs:
 
     - name: Build with PyInstaller (OneDir mode)
       run: |
-        pyinstaller --noconfirm --onedir --windowed --add-data "app.py;." --add-data "geo_data.py;." --collect-all streamlit --collect-all playwright --name "LeadGenPro_Elite" lanzador_windows.py
+        pyinstaller --noconfirm --onedir --add-data "app.py;." --add-data "geo_data.py;." --collect-all streamlit --collect-all playwright --name "LeadGenPro_Elite" lanzador_windows.py
 
     - name: Compile Inno Setup Installer
       run: |
