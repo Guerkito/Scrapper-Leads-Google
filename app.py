@@ -297,7 +297,22 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
 
 async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito, modo_escaneo, log_area, NICHOS_DICT, live_counter):
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=not v)
+        # Intentamos usar Chrome o Edge del sistema para ahorrar espacio y tiempo
+        try:
+            browser = await pw.chromium.launch(
+                headless=True,
+                channel="chrome"  # Usa el Google Chrome oficial instalado
+            )
+        except:
+            try:
+                browser = await pw.chromium.launch(
+                    headless=True,
+                    channel="msedge"  # Si no hay Chrome, usa Microsoft Edge (en todos los Windows)
+                )
+            except Exception as e:
+                st.error(f"⚠️ No se encontró Google Chrome o Edge en tu sistema: {e}")
+                return
+
         context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         search_list = []
         if n == "MODO_EXHAUSTIVO_TOTAL":

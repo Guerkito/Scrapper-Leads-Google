@@ -30,34 +30,8 @@ def print_banner():
     print(banner)
 
 def install_playwright():
-    if "_STREAMLIT_RUN_COMMAND_" in os.environ:
-        return
-        
-    try:
-        # Solo imprimimos si estamos en el proceso principal
-        print("[!] Verificando componentes del navegador (Chromium)...")
-        print("[!] Esto solo ocurre la primera vez y puede tardar 1-2 minutos.")
-        
-        # Ejecutamos la instalacion
-        process = subprocess.Popen(
-            ["playwright", "install", "chromium"],
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
-        )
-        
-        # Leemos la salida para dar feedback al usuario
-        while True:
-            line = process.stdout.readline()
-            if not line: break
-            if "Downloading" in line:
-                print(f" -> {line.strip()}", end="\r")
-        
-        process.wait()
-        print("\n[OK] Navegador listo para la acción.")
-    except Exception as e:
-        print(f"\n[!] Aviso: Error menor en preparacion: {e}")
+    # Ya no instalamos nada, usamos el Chrome del sistema
+    pass
 
 if __name__ == "__main__":
     freeze_support()
@@ -65,11 +39,8 @@ if __name__ == "__main__":
     try:
         if not "_STREAMLIT_RUN_COMMAND_" in os.environ:
             print_banner()
-            if getattr(sys, 'frozen', False):
-                install_playwright()
-            
-            print("\n[🚀] ¡Todo listo! Abriendo panel en tu navegador...")
-            time.sleep(1)
+            print("[!] Iniciando con el navegador del sistema...")
+            time.sleep(0.5)
 
         app_path = resolve_path("app.py")
         
