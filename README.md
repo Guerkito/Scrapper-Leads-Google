@@ -19,22 +19,29 @@
 - **Acceso Directo en Linux:** Abre la aplicación desde tu menú de inicio buscando **"Lead Gen Pro"**. ¡Adiós a la terminal!
 - **Script Lanzador:** Ejecución simplificada con un solo clic.
 
-## 💻 Descarga para Windows (EXE)
+## 💻 Instalación Rápida para Windows (Recomendado)
 
-¡Ya no necesitas saber programar para usar Lead Gen Pro! Hemos creado una versión ejecutable que puedes usar con un solo clic.
+¡Ya no necesitas usar la consola ni ser un experto! Hemos creado un lanzador automático para Windows.
 
-### 📥 Cómo descargar:
-1. Ve a la sección de **[Releases](https://github.com/Guerkito/Scrapper-Leads-Google/releases)** en este repositorio.
-2. Busca la última versión y descarga el archivo `LeadGenPro_Elite.exe`.
+### 📥 Pasos para empezar:
+1.  Haz clic en el botón verde **"<> Code"** (arriba a la derecha) y selecciona **"Download ZIP"**.
+2.  Descomprime la carpeta en tu escritorio.
+3.  **Haz doble clic en el archivo `INICIAR_LEADGEN.bat`**.
 
-### 🚀 Cómo usar:
-1. Haz doble clic en `LeadGenPro_Elite.exe`.
-2. **⚠️ Nota:** La primera vez que lo abras, el programa instalará automáticamente el navegador **Chromium** en segundo plano. Esto puede tardar 1 o 2 minutos.
-3. Una vez listo, se abrirá tu navegador predeterminado con el Panel de Control de Lead Gen Pro.
+### 🚀 ¿Qué pasará al abrirlo?
+*   El programa detectará si tienes Python. Si no lo tienes, te dirá de dónde bajarlo.
+*   Instalará automáticamente todas las librerías necesarias por ti.
+*   Abrirá el panel de control de **Lead Gen Pro** directamente en tu navegador.
 
 ---
 
-## 🛠️ Instalación para Desarrolladores (Linux/Python)
+### 🎨 ¿Quieres un icono en tu escritorio?
+1. Haz clic derecho en el archivo `INICIAR_LEADGEN.bat` y selecciona **"Enviar a" > "Escritorio (crear acceso directo)"**.
+2. ¡Listo! Ahora tienes un icono en tu escritorio para abrir el scraper cuando quieras.
+
+---
+
+## 🛠️ Instalación para Desarrolladores (Linux/Python Avanzado)
 
 1. **Clonar el repositorio:**
    ```bash
