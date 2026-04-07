@@ -14,9 +14,15 @@ if 'stop_requested' not in st.session_state: st.session_state.stop_requested = F
 if 'total_session' not in st.session_state: st.session_state.total_session = 0
 if 'last_summary' not in st.session_state: st.session_state.last_summary = None
 
+import os
+
+# --- DATABASE CONFIG ---
+DB_PATH = os.path.join("data", "leads.db")
+os.makedirs("data", exist_ok=True)
+
 # --- DATABASE (SPEED OPTIMIZED) ---
 def init_db():
-    conn = sqlite3.connect('leads.db', check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
     conn.execute('''CREATE TABLE IF NOT EXISTS leads (
@@ -34,7 +40,7 @@ def init_db():
     conn.commit(); conn.close()
 
 def save_lead(lead):
-    conn = sqlite3.connect('leads.db', check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.execute("PRAGMA journal_mode = WAL")
     try:
         conn.execute('''INSERT OR IGNORE INTO leads (nombre, telefono, rating, reseñas, tipo, lat, lng, zona, ciudad, pais, nicho, fecha, web, maps_url)
@@ -114,7 +120,7 @@ with st.sidebar:
 
 # --- DASHBOARD ---
 st.markdown("<h1 style='font-size: 2.2em; margin-bottom:0;'>LEAD GEN <span class='neon-text'>PRO ELITE</span></h1>", unsafe_allow_html=True)
-conn = sqlite3.connect('leads.db'); df_all = pd.read_sql_query("SELECT * FROM leads", conn); conn.close()
+conn = sqlite3.connect(DB_PATH); df_all = pd.read_sql_query("SELECT * FROM leads", conn); conn.close()
 
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("🎯 OBJETIVO", "∞" if infinito else max_res)
@@ -167,7 +173,7 @@ if view_mode == "🌓 DIVIDIDA":
         st.markdown(f"#### 📝 CRM ({len(df_f)} leads)")
         edited_df = st.data_editor(df_edit[['id', 'estado', 'notas', 'nombre', 'rating', 'Chat', 'maps_url']], column_config={"estado": st.column_config.SelectboxColumn("Status", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]), "Chat": st.column_config.LinkColumn("Chat 📲"), "maps_url": st.column_config.LinkColumn("Maps 📍"), "id": None}, disabled=["nombre", "rating", "Chat", "maps_url"], hide_index=True, width="stretch", height=500)
         if st.button("💾 GUARDAR CRM", type="primary"):
-            conn = sqlite3.connect('leads.db'); [conn.execute("UPDATE leads SET estado = ?, notas = ? WHERE id = ?", (r['estado'], r['notas'], r['id'])) for _, r in edited_df.iterrows()]; conn.commit(); conn.close(); st.rerun()
+            conn = sqlite3.connect(DB_PATH); [conn.execute("UPDATE leads SET estado = ?, notas = ? WHERE id = ?", (r['estado'], r['notas'], r['id'])) for _, r in edited_df.iterrows()]; conn.commit(); conn.close(); st.rerun()
 
 elif view_mode == "🗺️ MAPA FULL":
     map_data = df_f.dropna(subset=['lat', 'lng']).copy()
@@ -183,15 +189,15 @@ elif view_mode == "🗺️ MAPA FULL":
 elif view_mode == "📝 CRM FULL":
     edited_df = st.data_editor(df_edit[['id', 'estado', 'notas', 'nombre', 'rating', 'reseñas', 'tipo', 'Chat', 'web', 'maps_url', 'nicho', 'fecha', 'ciudad']], column_config={"estado": st.column_config.SelectboxColumn("Status", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]), "Chat": st.column_config.LinkColumn("Chat 📲"), "web": st.column_config.LinkColumn("Web"), "maps_url": st.column_config.LinkColumn("Maps 📍"), "id": None}, disabled=["nombre", "rating", "reseñas", "tipo", "Chat", "web", "maps_url", "nicho", "fecha", "ciudad"], hide_index=True, width="stretch", height=700)
     if st.button("💾 GUARDAR CAMBIOS CRM FULL", type="primary"):
-        conn = sqlite3.connect('leads.db'); [conn.execute("UPDATE leads SET estado = ?, notas = ? WHERE id = ?", (r['estado'], r['notas'], r['id'])) for _, r in edited_df.iterrows()]; conn.commit(); conn.close(); st.rerun()
+        conn = sqlite3.connect(DB_PATH); [conn.execute("UPDATE leads SET estado = ?, notas = ? WHERE id = ?", (r['estado'], r['notas'], r['id'])) for _, r in edited_df.iterrows()]; conn.commit(); conn.close(); st.rerun()
 
 st.divider(); ec1, ec2 = st.columns([0.7, 0.3])
 with ec1: st.download_button("📥 DESCARGAR CSV", df_all.to_csv(index=False), f"leads_{datetime.datetime.now().strftime('%Y%m%d')}.csv", use_container_width=True)
 with ec2:
     with st.expander("⚙️ ADMIN DB"):
-        if st.button("⚡ COMPACTAR DB", use_container_width=True): conn = sqlite3.connect('leads.db'); conn.execute("VACUUM"); conn.close(); st.success("Compactada")
+        if st.button("⚡ COMPACTAR DB", use_container_width=True): conn = sqlite3.connect(DB_PATH); conn.execute("VACUUM"); conn.close(); st.success("Compactada")
         if st.button("🗑️ BORRAR TODO", use_container_width=True):
-            if st.session_state.get('confirm_del', False): conn = sqlite3.connect('leads.db'); conn.execute("DELETE FROM leads"); conn.commit(); conn.close(); st.session_state.confirm_del = False; st.rerun()
+            if st.session_state.get('confirm_del', False): conn = sqlite3.connect(DB_PATH); conn.execute("DELETE FROM leads"); conn.commit(); conn.close(); st.session_state.confirm_del = False; st.rerun()
             else: st.warning("¿Seguro?"); st.session_state.confirm_del = True
 
 # --- ENGINE ---
@@ -297,21 +303,12 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
 
 async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito, modo_escaneo, log_area, NICHOS_DICT, live_counter):
     async with async_playwright() as pw:
-        # Intentamos usar Chrome o Edge del sistema para ahorrar espacio y tiempo
+        # En Docker usamos el chromium estándar instalado por playwright
         try:
-            browser = await pw.chromium.launch(
-                headless=True,
-                channel="chrome"  # Usa el Google Chrome oficial instalado
-            )
-        except:
-            try:
-                browser = await pw.chromium.launch(
-                    headless=True,
-                    channel="msedge"  # Si no hay Chrome, usa Microsoft Edge (en todos los Windows)
-                )
-            except Exception as e:
-                st.error(f"⚠️ No se encontró Google Chrome o Edge en tu sistema: {e}")
-                return
+            browser = await pw.chromium.launch(headless=True)
+        except Exception as e:
+            st.error(f"⚠️ Error al iniciar el navegador: {e}")
+            return
 
         context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         search_list = []
