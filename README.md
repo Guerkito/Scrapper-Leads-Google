@@ -1,3 +1,12 @@
+---
+title: Lead Gen Pro Elite
+emoji: 📍
+colorFrom: green
+colorTo: black
+sdk: docker
+app_port: 7860
+---
+
 # 🚀 Lead Gen Pro - Elite Command Center (v11.0)
 
 ¡Bienvenido a la herramienta definitiva de inteligencia comercial para agencias y freelancers! **Lead Gen Pro** extrae, califica y organiza prospectos de cualquier nicho en cualquier parte del mundo.
