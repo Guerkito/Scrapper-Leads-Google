@@ -288,7 +288,7 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
         await page.close()
         return found
 
-async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito, modo_escaneo, log_area, NICHOS_DICT, live_counter):
+async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo, log_area, NICHOS_DICT, live_counter):
     async with async_playwright() as pw:
         try:
             browser = await pw.chromium.launch(
@@ -330,5 +330,5 @@ if start_btn:
     st.session_state.total_session = 0
     live_c = log_container.empty()
     with st.expander("📄 Logs de Prospección", expanded=True):
-        asyncio.run(main_loop(nicho, ciudad_base, pais_sel, barrios, max_res, ver_nav, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
+        asyncio.run(main_loop(nicho, ciudad_base, pais_sel, barrios, max_res, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
     st.rerun()
