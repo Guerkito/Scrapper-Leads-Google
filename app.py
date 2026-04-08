@@ -305,7 +305,7 @@ async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito, modo_esca
     async with async_playwright() as pw:
         # En Docker usamos el chromium estándar instalado por playwright
         try:
-            browser = await pw.chromium.launch(headless=True)
+            browser = await pw.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
         except Exception as e:
             st.error(f"⚠️ Error al iniciar el navegador: {e}")
             return
