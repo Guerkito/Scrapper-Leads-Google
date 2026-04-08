@@ -8,19 +8,17 @@ import urllib.parse
 import re
 from geo_data import GEO_DATA
 import time
+import os
 
 # --- INITIALIZE STATE ---
 if 'stop_requested' not in st.session_state: st.session_state.stop_requested = False
 if 'total_session' not in st.session_state: st.session_state.total_session = 0
 if 'last_summary' not in st.session_state: st.session_state.last_summary = None
 
-import os
-
 # --- DATABASE CONFIG ---
 DB_PATH = os.path.join("data", "leads.db")
 os.makedirs("data", exist_ok=True)
 
-# --- DATABASE (SPEED OPTIMIZED) ---
 def init_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.execute("PRAGMA journal_mode = WAL")
@@ -32,8 +30,6 @@ def init_db():
         nicho TEXT, fecha TEXT, web TEXT, maps_url TEXT, estado TEXT DEFAULT 'Nuevo', notas TEXT)''')
     conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_estado ON leads(estado)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_nicho ON leads(nicho)")
-    
-    # Migración maps_url
     cursor = conn.execute("PRAGMA table_info(leads)")
     existing_cols = [row[1] for row in cursor.fetchall()]
     if "maps_url" not in existing_cols: conn.execute("ALTER TABLE leads ADD COLUMN maps_url TEXT")
@@ -51,34 +47,44 @@ def save_lead(lead):
 
 init_db()
 
-# --- CONSTANTS ---
 COUNTRY_CODES = {"Colombia": "57", "España": "34", "México": "52", "Argentina": "54", "Chile": "56", "Perú": "51", "Ecuador": "593", "Venezuela": "58", "Estados Unidos": "1", "Panamá": "507"}
 
-# --- UI CONFIG ---
+# --- UI CONFIG (RESPONSIVE) ---
 st.set_page_config(page_title="Lead Gen Pro | Elite Dashboard", layout="wide", page_icon="🟢")
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
     .stApp { background-color: #0a0a0a; font-family: 'Inter', sans-serif; color: #ffffff; }
     .neon-text { color: #39FF14; text-shadow: 0 0 8px rgba(57, 255, 20, 0.3); font-weight: 800; }
-    [data-testid="stSidebar"] { min-width: 320px !important; border-right: 1px solid #222; }
-    [data-testid="stExpander"] { background-color: #1a1a1a !important; border: 1px solid #333 !important; border-radius: 10px !important; }
-    .stButton>button { width: 100% !important; background: #111111 !important; color: #39FF14 !important; border: 1px solid #39FF14 !important; border-radius: 8px !important; font-weight: 700 !important; }
+    
+    /* Responsividad del Sidebar */
+    [data-testid="stSidebar"] { border-right: 1px solid #222; }
+    @media (min-width: 768px) {
+        [data-testid="stSidebar"] { min-width: 350px !important; }
+    }
+
+    [data-testid="stExpander"] { background-color: #161616 !important; border: 1px solid #333 !important; border-radius: 10px !important; margin-bottom: 10px; }
+    .stButton>button { width: 100% !important; background: #111111 !important; color: #39FF14 !important; border: 1px solid #39FF14 !important; border-radius: 8px !important; font-weight: 700 !important; padding: 0.5rem; transition: 0.3s; }
     .stButton>button:hover { background: #39FF14 !important; color: #000000 !important; box-shadow: 0 0 15px rgba(57, 255, 20, 0.4) !important; }
+    
     div[data-testid="stMetric"] { background: #161616; border-radius: 12px; padding: 10px !important; border: 1px solid #252525; }
+    
+    @media (max-width: 640px) {
+        .stMetric { margin-bottom: 10px; }
+        h1 { font-size: 1.5rem !important; }
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- UTILS ---
 def get_wa_link(row, country_name):
-    num = "".join(filter(str.isdigit, str(row['telefono'])))
+    tel = str(row['telefono']) if row['telefono'] else ""
+    num = "".join(filter(str.isdigit, tel))
     if not num or len(num) < 7: return None
     pref = COUNTRY_CODES.get(country_name, "")
     if pref and not num.startswith(pref): num = pref + num
     msg = f"Hola {row['nombre']}, vi tu negocio de {row['tipo']} en Google Maps. Tienes una puntuación de {row['rating']} y me gustaría comentarte algo. ¿Hablamos?"
     return f"https://wa.me/{num}?text={urllib.parse.quote(msg)}"
 
-# --- SIDEBAR (FULL NICHOS) ---
 with st.sidebar:
     st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND</h2>", unsafe_allow_html=True)
     st.divider()
@@ -114,11 +120,10 @@ with st.sidebar:
         exhaustivo = st.toggle("🚀 EXHAUSTIVO TOTAL (+250)", False)
         nicho = "MODO_EXHAUSTIVO_TOTAL" if exhaustivo else (f"SECTOR_{cat}" if "TODOS" in sub else sub)
     
-    max_res = st.number_input("CAPACIDAD:", 5, 5000, 50); infinito = st.toggle("♾️ ILIMITADO", False); ver_nav = st.checkbox("👁️ VER BROWSER", False)
+    max_res = st.number_input("CAPACIDAD:", 5, 5000, 50); infinito = st.toggle("♾️ ILIMITADO", False)
     st.divider(); c1, c2 = st.columns(2); start_btn = c1.button("🚀 INICIAR", type="primary"); stop_btn = c2.button("🛑 PARAR")
     if stop_btn: st.session_state.stop_requested = True
 
-# --- DASHBOARD ---
 st.markdown("<h1 style='font-size: 2.2em; margin-bottom:0;'>LEAD GEN <span class='neon-text'>PRO ELITE</span></h1>", unsafe_allow_html=True)
 conn = sqlite3.connect(DB_PATH); df_all = pd.read_sql_query("SELECT * FROM leads", conn); conn.close()
 
@@ -134,7 +139,6 @@ log_container = st.empty()
 if st.session_state.last_summary:
     st.success(f"🔥 Capturados: {st.session_state.last_summary['leads']}"); st.button("Limpiar", on_click=lambda: setattr(st.session_state, 'last_summary', None))
 
-# --- GESTIÓN Y FILTROS (RESTAURADOS) ---
 st.divider()
 view_mode = st.radio("💎 VISTA DE TRABAJO:", ["🌓 DIVIDIDA", "🗺️ MAPA FULL", "📝 CRM FULL"], horizontal=True)
 
@@ -200,55 +204,48 @@ with ec2:
             if st.session_state.get('confirm_del', False): conn = sqlite3.connect(DB_PATH); conn.execute("DELETE FROM leads"); conn.commit(); conn.close(); st.session_state.confirm_del = False; st.rerun()
             else: st.warning("¿Seguro?"); st.session_state.confirm_del = True
 
-# --- ENGINE ---
 async def scrape_zone(context, query, max_results, city, country, nicho_val, infinito, modo_escaneo, log_area, live_counter):
-    page = await context.new_page(); found, audited = 0, 0
+    page = await context.new_page()
+    found, audited = 0, 0
     try:
         await page.goto(f"https://www.google.com/maps/search/{urllib.parse.quote(query)}/?hl=es", wait_until="domcontentloaded", timeout=60000)
-        try: await page.click('button:has-text("Aceptar")', timeout=3000)
+        try: await page.click('button:has-text("Aceptar")', timeout=5000)
         except: pass
+        
         while (infinito or found < max_results) and not st.session_state.stop_requested:
             items = await page.query_selector_all("a.hfpxzc")
             if audited >= len(items):
                 feed = await page.query_selector("div[role='feed']")
                 if feed:
-                    await feed.evaluate("el => el.scrollBy(0, 1500)"); await asyncio.sleep(2)
-                    if len(await page.query_selector_all("a.hfpxzc")) == len(items): break
+                    await feed.evaluate("el => el.scrollBy(0, 1500)")
+                    await asyncio.sleep(2)
+                    new_items = await page.query_selector_all("a.hfpxzc")
+                    if len(new_items) == len(items): break
                     continue
                 else: break
-            item = items[audited]; audited += 1
+            
+            item = items[audited]
+            audited += 1
             try:
                 name = await item.get_attribute("aria-label")
                 if not name: continue
-                await item.scroll_into_view_if_needed(); await asyncio.sleep(0.5)
-                try: await item.click(timeout=3000, force=True)
+                await item.scroll_into_view_if_needed()
+                await asyncio.sleep(0.5)
+                try: await item.click(timeout=5000, force=True)
                 except: await item.evaluate("el => el.click()")
-                try: await page.wait_for_selector("h1.DUwDvf", timeout=5000)
-                except: continue
+                
+                await asyncio.sleep(1) # Pequeña espera para carga de panel lateral
                 
                 maps_url = page.url
-                # DETECTOR DE WEB PROFESIONAL (4 CAPAS)
                 w_url = "Sin sitio web"
                 try:
-                    # Esperar un momento extra solo para la web
-                    web_selectors = [
-                        "a[data-item-id='authority']", 
-                        "a[aria-label*='Sitio web']", 
-                        "a[aria-label*='Website']", 
-                        "a[data-tooltip*='Sitio web']",
-                        "a[data-value='Sitio web']"
-                    ]
+                    web_selectors = ["a[data-item-id='authority']", "a[aria-label*='Sitio web']", "a[data-value='Sitio web']"]
                     for selector in web_selectors:
                         w_btn = await page.query_selector(selector)
                         if w_btn:
                             raw_url = await w_btn.get_attribute("href")
-                            if raw_url and "google.com/url" in raw_url:
-                                # Limpiar redirecciones de Google si existen
-                                parsed = urllib.parse.urlparse(raw_url)
-                                w_url = urllib.parse.parse_qs(parsed.query).get('q', [raw_url])[0]
-                            else:
-                                w_url = raw_url
-                            if w_url: break
+                            w_url = raw_url if raw_url else "Sin sitio web"
+                            break
                 except: pass
                 
                 tiene_w = w_url != "Sin sitio web"
@@ -256,61 +253,57 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                     log_area.write(f"⏭️ Saltado: {name}"); continue
                 
                 lat, lng = None, None
-                for _ in range(10):
+                for _ in range(5):
                     m = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", page.url)
-                    if not m: m = re.search(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)", page.url)
                     if m: lat, lng = float(m.group(1)), float(m.group(2)); break
                     await asyncio.sleep(0.5)
                 
                 p_el = await page.query_selector('button[data-item-id^="phone:tel:"]')
                 phone = await p_el.inner_text() if p_el else "N/A"
                 
-                # EXTRACCIÓN DE REPUTACIÓN (Rating y Reseñas)
                 r_num, rev_num = "N/A", "0"
                 try:
-                    # Intento 1: Selector de span por aria-label
-                    r_el = await page.query_selector("span[aria-label*='estrellas'], span[aria-label*='stars']")
+                    r_el = await page.query_selector("span[aria-label*='estrellas']")
                     if r_el:
                         r_raw = await r_el.get_attribute("aria-label")
                         m_r = re.search(r"(\d[,\.]\d)", r_raw)
                         if m_r: r_num = f"{m_r.group(1).replace(',', '.')} / 5"
                     
-                    # Intento 2: Si sigue N/A, buscar por clase específica de Maps
-                    if r_num == "N/A":
-                        r_el_alt = await page.query_selector("div.F7B6Xc, span.ceNzR")
-                        if r_el_alt:
-                            r_raw = await r_el_alt.inner_text()
-                            m_r = re.search(r"(\d[,\.]\d)", r_raw)
-                            if m_r: r_num = f"{m_r.group(1).replace(',', '.')} / 5"
-                except: pass
-
-                try:
-                    # Reseñas: buscar el botón que contiene el número de opiniones
-                    rev_el = await page.query_selector("button[aria-label*='reseñas'], button[aria-label*='reviews'], span[aria-label*='reseñas']")
+                    rev_el = await page.query_selector("button[aria-label*='reseñas']")
                     if rev_el:
                         rev_raw = await rev_el.get_attribute("aria-label")
                         rev_num = "".join(filter(str.isdigit, rev_raw)) or "0"
                 except: pass
-                tipo_el = await page.query_selector('button[class="Dener"]')
+
+                tipo_el = await page.query_selector('button[class*="Dener"]')
                 tipo_txt = await tipo_el.inner_text() if tipo_el else nicho_val
 
                 save_lead({"Nombre": name, "Teléfono": phone, "Rating": r_num, "Reseñas": rev_num, "Tipo": tipo_txt, "Lat": lat, "Lng": lng, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val, "Web": w_url, "Maps_URL": maps_url})
-                found += 1; st.session_state.total_session += 1
+                found += 1
+                st.session_state.total_session += 1
                 live_counter.markdown(f"<div style='background:#111;border:2px solid #39FF14;border-radius:15px;padding:15px;text-align:center'><h1 style='margin:0;color:#39FF14'>{st.session_state.total_session} LEADS</h1></div>", unsafe_allow_html=True)
                 log_area.write(f"✅ CAPTURADO: {name}")
             except: continue
-    finally: await page.close(); return found
+    finally:
+        await page.close()
+        return found
 
 async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito, modo_escaneo, log_area, NICHOS_DICT, live_counter):
     async with async_playwright() as pw:
-        # En Docker usamos el chromium estándar instalado por playwright
         try:
-            browser = await pw.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
+            browser = await pw.chromium.launch(
+                headless=True, 
+                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process']
+            )
         except Exception as e:
-            st.error(f"⚠️ Error al iniciar el navegador: {e}")
+            st.error(f"⚠️ Error al iniciar el motor: {e}")
             return
 
-        context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            viewport={'width': 1280, 'height': 720}
+        )
+        
         search_list = []
         if n == "MODO_EXHAUSTIVO_TOTAL":
             for sub in NICHOS_DICT.values(): search_list.extend([x for x in sub if "TODOS" not in x])
@@ -318,17 +311,24 @@ async def main_loop(n, city_base, p, barrios_list, max_r, v, infinito, modo_esca
         elif n.startswith("SECTOR_"):
             search_list = [x for x in NICHOS_DICT[n.replace("SECTOR_","")] if "TODOS" not in x]
         else: search_list = [n]
+        
         leads_sesion = 0
         for b in barrios_list:
             if st.session_state.stop_requested: break
             for ni in search_list:
                 if st.session_state.stop_requested: break
                 query = f"{ni} en {b}, {city_base}, {p}" if b else f"{ni} en {city_base}, {p}"
-                st.toast(f"🔎: {ni}"); leads_sesion += await scrape_zone(context, query, max_r, city_base, p, ni, infinito, modo_escaneo, log_area, live_counter)
-        await browser.close(); st.session_state.last_summary = {'leads': leads_sesion}
+                st.toast(f"🔎: {ni}")
+                leads_sesion += await scrape_zone(context, query, max_r, city_base, p, ni, infinito, modo_escaneo, log_area, live_counter)
+        
+        await browser.close()
+        st.session_state.last_summary = {'leads': leads_sesion}
 
 if start_btn:
-    st.session_state.last_summary = None; st.session_state.stop_requested = False; st.session_state.total_session = 0
+    st.session_state.last_summary = None
+    st.session_state.stop_requested = False
+    st.session_state.total_session = 0
     live_c = log_container.empty()
-    with st.expander("📄 Logs", expanded=False): asyncio.run(main_loop(nicho, ciudad_base, pais_sel, barrios, max_res, ver_nav, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
+    with st.expander("📄 Logs de Prospección", expanded=True):
+        asyncio.run(main_loop(nicho, ciudad_base, pais_sel, barrios, max_res, ver_nav, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
     st.rerun()
