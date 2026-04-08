@@ -2,7 +2,7 @@
 title: Lead Gen Pro Elite
 emoji: 📍
 colorFrom: green
-colorTo: black
+colorTo: indigo
 sdk: docker
 app_port: 7860
 ---
