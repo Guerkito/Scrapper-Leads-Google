@@ -100,7 +100,7 @@ def get_wa_link(row, country_name):
     return f"https://wa.me/{num}?text={urllib.parse.quote(msg)}"
 
 with st.sidebar:
-    st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND <br><small style='color:gray;font-size:12px;'>v1.0.9</small></h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND <br><small style='color:gray;font-size:12px;'>v1.1.0</small></h2>", unsafe_allow_html=True)
     st.divider()
     modo_escaneo = st.selectbox("MODO DE ESCANEO:", ["🎯 Caza-Sitios (Solo SIN web)", "📈 SEO Audit (Solo CON web)", "🔎 Full Scan (Todo)"])
     
@@ -220,7 +220,19 @@ with ec2:
 
 async def scrape_zone(context, query, max_results, city, country, nicho_val, infinito, modo_escaneo, log_area, live_counter):
     page = await context.new_page()
-    await playwright_stealth.stealth_async(page)
+    
+    # --- FAILSAFE STEALTH CALL ---
+    try:
+        if hasattr(playwright_stealth, 'stealth_async'):
+            await playwright_stealth.stealth_async(page)
+        elif hasattr(playwright_stealth, 'stealth'):
+            # Si es una función, la llamamos (algunas versiones no son async)
+            if callable(playwright_stealth.stealth):
+                try: await playwright_stealth.stealth(page)
+                except: playwright_stealth.stealth(page)
+    except Exception as e:
+        log_area.write(f"⚠️ Nota: Sigilo no aplicado ({e})")
+    
     found, audited = 0, 0
     try:
         await page.goto(f"https://www.google.com/maps/search/{urllib.parse.quote(query)}/?hl=es", wait_until="domcontentloaded", timeout=60000)
