@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-# Instalar dependencias del sistema necesarias para Playwright
+# Versión para romper caché: 1.0.2
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -29,41 +29,35 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Configurar el usuario para Hugging Face (UID 1000)
+# Configurar el usuario primero
 RUN useradd -m -u 1000 user
 WORKDIR /home/user/app
 
-# Configurar variables de entorno para Playwright
-ENV HOME=/home/user \
-    PATH=/home/user/.local/bin:$PATH \
-    PLAYWRIGHT_BROWSERS_PATH=/home/user/app/ms-playwright
-
-# Instalar dependencias de Python
-COPY requirements.txt .
-RUN pip install --no-cache-dir -U pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Crear carpeta de navegadores y descargar Chromium
-RUN mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
-    playwright install chromium && \
-    playwright install-deps chromium
-
-# Copiar el código
-COPY . .
-
-# Dar permisos totales al usuario sobre la carpeta de la app y los navegadores
-RUN chown -R user:user /home/user/app && \
-    chmod -R 777 /home/user/app/ms-playwright
-
-USER user
-
+# Definir rutas de Playwright ANTES de instalar nada
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH \
     PLAYWRIGHT_BROWSERS_PATH=/home/user/app/ms-playwright \
+    PYTHONUNBUFFERED=1 \
     STREAMLIT_SERVER_PORT=7860 \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
     STREAMLIT_SERVER_ENABLE_CORS=false \
     STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
+
+# Instalar dependencias de Python
+COPY --chown=user:user requirements.txt .
+RUN pip install --no-cache-dir -U pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Instalar navegadores en la carpeta de la app como el usuario 1000
+RUN mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
+    chown -R user:user /home/user/app && \
+    playwright install chromium && \
+    playwright install-deps chromium
+
+# Copiar el resto del código
+COPY --chown=user:user . .
+
+USER user
 
 EXPOSE 7860
 
