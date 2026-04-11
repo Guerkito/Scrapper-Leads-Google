@@ -1,22 +1,21 @@
 FROM python:3.10-slim
 
-# v1.0.6 - Corrección de permisos de instalación
+# v1.0.7 - Corrección total de permisos de carpeta app
 RUN apt-get update && apt-get install -y \
     wget gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Playwright temporalmente como root para configurar el sistema
-RUN pip install --no-cache-dir playwright
+# Instalar Playwright y dependencias de sistema como ROOT
+RUN pip install --no-cache-dir playwright && \
+    playwright install-deps chromium
 
-# Instalar dependencias del sistema para Chromium como ROOT
-# Esto evita que pida contraseña después
-RUN playwright install-deps chromium
-
-# Crear usuario y preparar entorno
+# Crear usuario y configurar su carpeta de inicio
 RUN useradd -m -u 1000 user
 WORKDIR /home/user/app
 
-# Cambiar al usuario para las tareas de la aplicación
+# IMPORTANTE: Cambiar el dueño de la carpeta de la app al usuario 1000 antes de cambiar de usuario
+RUN chown user:user /home/user/app
+
 USER user
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH \
@@ -28,7 +27,7 @@ COPY --chown=user:user deps.txt .
 RUN pip install --no-cache-dir -U pip && \
     pip install --no-cache-dir -r deps.txt
 
-# Instalar el navegador Chromium en la carpeta de la app
+# Ahora el usuario ya tiene permiso para crear carpetas aquí
 RUN mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
     playwright install chromium
 
