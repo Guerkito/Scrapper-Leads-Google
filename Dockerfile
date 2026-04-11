@@ -36,28 +36,30 @@ WORKDIR /home/user/app
 # Configurar variables de entorno para Playwright
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH \
-    PLAYWRIGHT_BROWSERS_PATH=/home/user/pw-browsers
+    PLAYWRIGHT_BROWSERS_PATH=/home/user/app/ms-playwright
 
 # Instalar dependencias de Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -U pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Instalar navegadores de Playwright en la ruta del usuario
+# Crear carpeta de navegadores y descargar Chromium
 RUN mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
     playwright install chromium && \
-    playwright install-deps chromium && \
-    chown -R user:user /home/user
+    playwright install-deps chromium
 
 # Copiar el código
 COPY . .
-RUN chown -R user:user /home/user/app
+
+# Dar permisos totales al usuario sobre la carpeta de la app y los navegadores
+RUN chown -R user:user /home/user/app && \
+    chmod -R 777 /home/user/app/ms-playwright
 
 USER user
 
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH \
-    PLAYWRIGHT_BROWSERS_PATH=/home/user/pw-browsers \
+    PLAYWRIGHT_BROWSERS_PATH=/home/user/app/ms-playwright \
     STREAMLIT_SERVER_PORT=7860 \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
     STREAMLIT_SERVER_ENABLE_CORS=false \
@@ -66,4 +68,4 @@ ENV HOME=/home/user \
 EXPOSE 7860
 
 # Comando para arrancar Streamlit
-CMD ["streamlit", "run", "app.py", "--server.port", "7860", "--server.address", "0.0.0.0"]
+CMD ["streamlit", "run", "app.py"]
