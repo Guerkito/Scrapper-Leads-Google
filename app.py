@@ -2,7 +2,7 @@ import streamlit as st
 import asyncio
 import pandas as pd
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth
+import playwright_stealth
 import sqlite3
 import datetime
 import urllib.parse
@@ -100,7 +100,7 @@ def get_wa_link(row, country_name):
     return f"https://wa.me/{num}?text={urllib.parse.quote(msg)}"
 
 with st.sidebar:
-    st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND <br><small style='color:gray;font-size:12px;'>v1.0.8</small></h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND <br><small style='color:gray;font-size:12px;'>v1.0.9</small></h2>", unsafe_allow_html=True)
     st.divider()
     modo_escaneo = st.selectbox("MODO DE ESCANEO:", ["🎯 Caza-Sitios (Solo SIN web)", "📈 SEO Audit (Solo CON web)", "🔎 Full Scan (Todo)"])
     
@@ -220,7 +220,7 @@ with ec2:
 
 async def scrape_zone(context, query, max_results, city, country, nicho_val, infinito, modo_escaneo, log_area, live_counter):
     page = await context.new_page()
-    await stealth(page)
+    await playwright_stealth.stealth_async(page)
     found, audited = 0, 0
     try:
         await page.goto(f"https://www.google.com/maps/search/{urllib.parse.quote(query)}/?hl=es", wait_until="domcontentloaded", timeout=60000)
