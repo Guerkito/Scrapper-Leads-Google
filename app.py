@@ -2,6 +2,7 @@ import streamlit as st
 import asyncio
 import pandas as pd
 from playwright.async_api import async_playwright
+from playwright_stealth import stealth_async
 import sqlite3
 import datetime
 import urllib.parse
@@ -14,10 +15,26 @@ import os
 if 'stop_requested' not in st.session_state: st.session_state.stop_requested = False
 if 'total_session' not in st.session_state: st.session_state.total_session = 0
 if 'last_summary' not in st.session_state: st.session_state.last_summary = None
+if 'error_msg' not in st.session_state: st.session_state.error_msg = None
+
+# --- UI CONFIG (RESPONSIVE) ---
+st.set_page_config(page_title="Lead Gen Pro | Elite Dashboard", layout="wide", page_icon="🟢")
+
+if st.session_state.error_msg:
+    with st.container():
+        st.error(f"🚨 ERROR DETECTADO:\n\n{st.session_state.error_msg}")
+        if st.button("️🗑️ CERRAR ERROR"):
+            st.session_state.error_msg = None
+            st.rerun()
 
 # --- DATABASE CONFIG ---
-DB_PATH = os.path.join("data", "leads.db")
-os.makedirs("data", exist_ok=True)
+if os.path.exists("/data"):
+    DB_DIR = "/data"
+else:
+    DB_DIR = os.path.join(os.getcwd(), "data")
+    os.makedirs(DB_DIR, exist_ok=True)
+
+DB_PATH = os.path.join(DB_DIR, "leads.db")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -48,9 +65,6 @@ def save_lead(lead):
 init_db()
 
 COUNTRY_CODES = {"Colombia": "57", "España": "34", "México": "52", "Argentina": "54", "Chile": "56", "Perú": "51", "Ecuador": "593", "Venezuela": "58", "Estados Unidos": "1", "Panamá": "507"}
-
-# --- UI CONFIG (RESPONSIVE) ---
-st.set_page_config(page_title="Lead Gen Pro | Elite Dashboard", layout="wide", page_icon="🟢")
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -206,6 +220,7 @@ with ec2:
 
 async def scrape_zone(context, query, max_results, city, country, nicho_val, infinito, modo_escaneo, log_area, live_counter):
     page = await context.new_page()
+    await stealth_async(page)
     found, audited = 0, 0
     try:
         await page.goto(f"https://www.google.com/maps/search/{urllib.parse.quote(query)}/?hl=es", wait_until="domcontentloaded", timeout=60000)
@@ -293,10 +308,20 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
         try:
             browser = await pw.chromium.launch(
                 headless=True, 
-                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process']
+                args=[
+                    '--no-sandbox', 
+                    '--disable-setuid-sandbox', 
+                    '--disable-dev-shm-usage', 
+                    '--disable-gpu', 
+                    '--no-zygote', 
+                    '--single-process',
+                    '--disable-blink-features=AutomationControlled'
+                ]
             )
         except Exception as e:
-            st.error(f"⚠️ Error al iniciar el motor: {e}")
+            import traceback
+            error_details = traceback.format_exc()
+            st.session_state.error_msg = f"❌ ERROR CRÍTICO AL INICIAR NAVEGADOR: {e}\n\nDetalles:\n{error_details}"
             return
 
         context = await browser.new_context(
@@ -304,25 +329,35 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
             viewport={'width': 1280, 'height': 720}
         )
         
-        search_list = []
-        if n == "MODO_EXHAUSTIVO_TOTAL":
-            for sub in NICHOS_DICT.values(): search_list.extend([x for x in sub if "TODOS" not in x])
-            search_list = sorted(list(set(search_list)))
-        elif n.startswith("SECTOR_"):
-            search_list = [x for x in NICHOS_DICT[n.replace("SECTOR_","")] if "TODOS" not in x]
-        else: search_list = [n]
-        
-        leads_sesion = 0
-        for b in barrios_list:
-            if st.session_state.stop_requested: break
-            for ni in search_list:
+        try:
+            search_list = []
+            if n == "MODO_EXHAUSTIVO_TOTAL":
+                for sub in NICHOS_DICT.values(): search_list.extend([x for x in sub if "TODOS" not in x])
+                search_list = sorted(list(set(search_list)))
+            elif n.startswith("SECTOR_"):
+                search_list = [x for x in NICHOS_DICT[n.replace("SECTOR_","")] if "TODOS" not in x]
+            else: search_list = [n]
+            
+            leads_sesion = 0
+            for b in barrios_list:
                 if st.session_state.stop_requested: break
-                query = f"{ni} en {b}, {city_base}, {p}" if b else f"{ni} en {city_base}, {p}"
-                st.toast(f"🔎: {ni}")
-                leads_sesion += await scrape_zone(context, query, max_r, city_base, p, ni, infinito, modo_escaneo, log_area, live_counter)
-        
-        await browser.close()
-        st.session_state.last_summary = {'leads': leads_sesion}
+                for ni in search_list:
+                    if st.session_state.stop_requested: break
+                    query = f"{ni} en {b}, {city_base}, {p}" if b else f"{ni} en {city_base}, {p}"
+                    st.toast(f"🔎: {ni}")
+                    try:
+                        leads_sesion += await scrape_zone(context, query, max_r, city_base, p, ni, infinito, modo_escaneo, log_area, live_counter)
+                    except Exception as e:
+                        st.warning(f"⚠️ Error en zona {query}: {e}")
+            
+            await browser.close()
+            st.session_state.last_summary = {'leads': leads_sesion}
+        except Exception as e:
+            st.error(f"❌ ERROR DURANTE EL ESCANEO: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+        finally:
+            if 'browser' in locals(): await browser.close()
 
 if start_btn:
     st.session_state.last_summary = None
@@ -330,5 +365,9 @@ if start_btn:
     st.session_state.total_session = 0
     live_c = log_container.empty()
     with st.expander("📄 Logs de Prospección", expanded=True):
-        asyncio.run(main_loop(nicho, ciudad_base, pais_sel, barrios, max_res, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
-    st.rerun()
+        try:
+            asyncio.run(main_loop(nicho, ciudad_base, pais_sel, barrios, max_res, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
+        except Exception as e:
+            st.error(f"Hubo un fallo inesperado: {e}")
+    if st.session_state.last_summary:
+        st.rerun()

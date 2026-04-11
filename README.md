@@ -13,6 +13,15 @@ app_port: 7860
 
 ---
 
+### ⚠️ IMPORTANTE: Persistencia en Hugging Face
+Para evitar que tus leads capturados se borren al reiniciar el Space, **debes activar el Persistent Storage**:
+1. Ve a la pestaña **"Settings"** de tu Space en Hugging Face.
+2. Baja hasta **"Persistent Storage"**.
+3. Haz clic en **"Choose storage tier"** y selecciona una opción (la de 20GB es suficiente).
+4. La aplicación guardará automáticamente la base de datos en `/data`, que es el volumen montado, para que tus datos sobrevivan a reinicios.
+
+---
+
 ## 💻 Instalación Rápida para Windows (Recomendado)
 
 ¡Ya no necesitas usar la consola ni ser un experto! Sigue estos 3 pasos:
