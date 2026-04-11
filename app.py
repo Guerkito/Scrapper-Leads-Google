@@ -100,7 +100,7 @@ def get_wa_link(row, country_name):
     return f"https://wa.me/{num}?text={urllib.parse.quote(msg)}"
 
 with st.sidebar:
-    st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND <br><small style='color:gray;font-size:12px;'>v1.0.5</small></h2>", unsafe_allow_html=True)
     st.divider()
     modo_escaneo = st.selectbox("MODO DE ESCANEO:", ["🎯 Caza-Sitios (Solo SIN web)", "📈 SEO Audit (Solo CON web)", "🔎 Full Scan (Todo)"])
     
@@ -315,7 +315,12 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
                     '--disable-gpu', 
                     '--no-zygote', 
                     '--single-process',
-                    '--disable-blink-features=AutomationControlled'
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-extensions',
+                    '--disable-infobars',
+                    '--disable-dev-shm-usage',
+                    '--disable-browser-side-navigation',
+                    '--disable-features=IsolateOrigins,site-per-process'
                 ]
             )
         except Exception as e:

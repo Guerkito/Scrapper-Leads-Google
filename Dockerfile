@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-# Force full rebuild - v1.0.4
+# Versión de limpieza total: 1.0.5
 RUN apt-get update && apt-get install -y \
     wget gnupg libgbm-dev libnss3 libasound2 libxshmfence1 libatk-bridge2.0-0 libgtk-3-0 \
     libx11-xcb1 libxcb-dri3-0 libxcomposite1 libxcursor1 libxdamage1 libxfixes3 \
@@ -8,38 +8,33 @@ RUN apt-get update && apt-get install -y \
     libatk1.0-0 libcairo-gobject2 libcairo2 libgdk-pixbuf-2.0-0 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Crear usuario y entorno antes de copiar nada
+# Crear usuario y cambiar a él antes de instalar nada
 RUN useradd -m -u 1000 user
+USER user
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH \
-    PLAYWRIGHT_BROWSERS_PATH=/home/user/app/pw-browsers \
-    STREAMLIT_SERVER_PORT=7860 \
-    STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
-    STREAMLIT_SERVER_ENABLE_CORS=false \
-    STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
+    PYTHONUNBUFFERED=1
 
 WORKDIR /home/user/app
 
-# Instalar dependencias desde el nuevo archivo deps.txt
+# Instalar dependencias de Python como el usuario user
 COPY --chown=user:user deps.txt .
 RUN pip install --no-cache-dir -U pip && \
     pip install --no-cache-dir -r deps.txt
 
-# Instalar navegadores en la ruta local del usuario
-RUN mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
-    chown -R user:user /home/user/app && \
-    playwright install chromium && \
+# Instalar navegadores en la ruta por defecto del usuario (~/.cache/ms-playwright)
+RUN playwright install chromium && \
     playwright install-deps chromium
 
-# Copiar el código fuente
+# Copiar el código
 COPY --chown=user:user . .
-
-# Limpiar chowns finales
-RUN chown -R user:user /home/user/app
-
-USER user
 
 EXPOSE 7860
 
-# Comando para arrancar Streamlit
-ENTRYPOINT ["streamlit", "run", "app.py"]
+# Forzar configuración de Streamlit
+ENV STREAMLIT_SERVER_PORT=7860 \
+    STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
+    STREAMLIT_SERVER_ENABLE_CORS=false \
+    STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
+
+CMD ["streamlit", "run", "app.py"]
