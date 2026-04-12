@@ -39,19 +39,24 @@ COUNTRY_CODES = {
 # Helpers
 # ---------------------------------------------------------------------------
 def _run_async(coro):
-    """Ejecuta una coroutine en un thread con su propio event loop (evita
-    conflictos con el loop interno de Streamlit)."""
+    """Ejecuta una coroutine en un thread con su propio event loop.
+    Propaga cualquier excepción del thread al hilo principal."""
     result = {}
+    exc_holder = [None]
     def _target():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
             result['value'] = loop.run_until_complete(coro)
+        except Exception as e:
+            exc_holder[0] = e
         finally:
             loop.close()
     t = threading.Thread(target=_target)
     t.start()
     t.join()
+    if exc_holder[0]:
+        raise exc_holder[0]
     return result.get('value')
 
 
@@ -305,6 +310,6 @@ if start_btn:
                 st, NICHOS_DICT, live_c, progress_bar,
             ))
         except Exception as e:
-            st.error(f"Hubo un fallo inesperado: {e}")
-    if st.session_state.last_summary:
-        st.rerun()
+            import traceback
+            st.session_state.error_msg = f"{e}\n\n{traceback.format_exc()}"
+    st.rerun()  # siempre rerun al terminar para mostrar resultados o errores

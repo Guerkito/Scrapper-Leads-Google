@@ -206,10 +206,9 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
             browser = await pw.chromium.launch(headless=True, args=BROWSER_ARGS)
         except Exception as e:
             import traceback
-            st.session_state.error_msg = (
-                f"❌ ERROR CRÍTICO AL INICIAR NAVEGADOR: {e}\n\nDetalles:\n{traceback.format_exc()}"
-            )
-            return
+            msg = f"❌ ERROR CRÍTICO AL INICIAR NAVEGADOR: {e}\n\nDetalles:\n{traceback.format_exc()}"
+            st.session_state.error_msg = msg
+            raise RuntimeError(msg)  # propaga al _run_async para que sea visible
 
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -237,15 +236,16 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
                     if st.session_state.stop_requested:
                         return 0
                     query = f"{ni} en {b}, {city_base}, {p}" if b else f"{ni} en {city_base}, {p}"
-                    result = await scrape_zone(
-                        context, query, max_r, city_base, p, ni,
-                        infinito, modo_escaneo, log_area, live_counter, db_conn,
-                    )
                     done[0] += 1
-                    pct = int(done[0] / total_tasks * 100) if total_tasks else 0
+                    pct = max(1, int(done[0] / total_tasks * 100)) if total_tasks else 1
                     progress_bar.progress(
                         pct,
                         text=f"🔎 {done[0]}/{total_tasks} — {ni}" + (f" · {b}" if b else ""),
+                    )
+                    log_area.write(f"🔍 Escaneando: {query}")
+                    result = await scrape_zone(
+                        context, query, max_r, city_base, p, ni,
+                        infinito, modo_escaneo, log_area, live_counter, db_conn,
                     )
                     return result
 
