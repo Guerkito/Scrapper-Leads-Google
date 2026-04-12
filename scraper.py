@@ -16,7 +16,7 @@ async def _is_captcha(page) -> bool:
     el = await page.query_selector('iframe[src*="recaptcha"], #captcha, form#captcha-form')
     return el is not None
 
-MAX_CONCURRENT = 3  # páginas simultáneas máximas
+MAX_CONCURRENT = 5  # páginas simultáneas máximas
 
 BROWSER_ARGS = [
     '--no-sandbox',
@@ -74,10 +74,17 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val,
 
     found, audited = 0, 0
     try:
-        await page.goto(
-            f"https://www.google.com/maps/search/{urllib.parse.quote(query)}/?hl=es",
-            wait_until="domcontentloaded", timeout=60000,
-        )
+        # Si query viene codificado como "coord:lat,lng,zoom" usamos URL por coordenadas
+        if query.startswith("coord:"):
+            _, coords_str = query.split(":", 1)
+            _clat, _clng, _czoom = coords_str.split(",")
+            _search_term = nicho_val  # solo el término de búsqueda, las coords van en la URL
+            goto_url = (f"https://www.google.com/maps/search/"
+                        f"{urllib.parse.quote(_search_term)}/@{_clat},{_clng},{_czoom}z?hl=es")
+        else:
+            goto_url = f"https://www.google.com/maps/search/{urllib.parse.quote(query)}/?hl=es"
+
+        await page.goto(goto_url, wait_until="domcontentloaded", timeout=60000)
         try:
             await page.click('button:has-text("Aceptar")', timeout=5000)
         except Exception:
@@ -214,7 +221,7 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val,
 
 
 async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo,
-                    log_area, NICHOS_DICT, live_counter, progress_bar):
+                    log_area, NICHOS_DICT, live_counter, progress_bar, extra_terms=None):
     async with async_playwright() as pw:
         try:
             browser = await pw.chromium.launch(headless=True, args=BROWSER_ARGS)
@@ -239,6 +246,8 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
                 search_list = [x for x in NICHOS_DICT[n.replace("SECTOR_", "")] if "TODOS" not in x]
             else:
                 search_list = [n]
+                if extra_terms:
+                    search_list.extend(extra_terms)
 
             all_zones = [(b, ni) for b in barrios_list for ni in search_list]
             total_tasks = len(all_zones)
@@ -249,14 +258,21 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
                 async with sem:
                     if st.session_state.stop_requested:
                         return 0
-                    query = f"{ni} en {b}, {city_base}, {p}" if b else f"{ni} en {city_base}, {p}"
+                    # Si es coordenada GPS, el "query" lleva el prefijo coord:
+                    # scrape_zone lo detecta y construye la URL con @lat,lng,zoom
+                    if b.startswith("coord:"):
+                        query = b  # "coord:lat,lng,zoom"
+                        label = f"GPS {b.split(':')[1]}"
+                    else:
+                        query = f"{ni} en {b}, {city_base}, {p}" if b else f"{ni} en {city_base}, {p}"
+                        label = b or city_base
                     done[0] += 1
                     pct = max(1, int(done[0] / total_tasks * 100)) if total_tasks else 1
                     progress_bar.progress(
                         pct,
-                        text=f"🔎 {done[0]}/{total_tasks} — {ni}" + (f" · {b}" if b else ""),
+                        text=f"🔎 {done[0]}/{total_tasks} — {ni} · {label}",
                     )
-                    log_area.write(f"🔍 Escaneando: {query}")
+                    log_area.write(f"🔍 Escaneando: {ni} @ {label}")
                     result = await scrape_zone(
                         context, query, max_r, city_base, p, ni,
                         infinito, modo_escaneo, log_area, live_counter, db_conn,

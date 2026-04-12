@@ -8,6 +8,7 @@ import pandas as pd
 from geo_data import GEO_DATA
 from db import DB_PATH, init_db
 from scraper import main_loop
+from city_coords import generate_grid, CITY_COORDS
 
 # ---------------------------------------------------------------------------
 # Nichos — nivel módulo para evitar recrearlos en cada rerun
@@ -27,6 +28,84 @@ NICHOS_DICT = {
     "🐾 MASCOTAS": ["TODOS LOS SUBNICHOS (Sector Mascotas)", "Veterinarias", "Peluquería Canina", "Tiendas de Mascotas"],
     "🎉 EVENTOS & TURISMO": ["TODOS LOS SUBNICHOS (Sector Turismo)", "Hoteles", "Salones de Eventos", "Fotógrafos", "Agencias de Viajes"],
     "👔 SERVICIOS EMPRESARIALES": ["TODOS LOS SUBNICHOS (Sector B2B)", "Seguridad Privada", "Mensajería", "Mudanzas", "Imprentas"],
+}
+
+# Términos alternativos por nicho para ampliar la cobertura de búsqueda
+NICHO_SYNONYMS = {
+    "Odontólogos":            ["Dentistas", "Clínica dental"],
+    "Clínicas Médicas":       ["Centro médico", "Consultorio médico"],
+    "Psicólogos":             ["Psicología", "Terapeuta"],
+    "Fisioterapeutas":        ["Fisioterapia", "Rehabilitación física"],
+    "Ópticas":                ["Optometría", "Óptico"],
+    "Dermatólogos":           ["Dermatología", "Clínica estética"],
+    "Ginecólogos":            ["Ginecología"],
+    "Pediatras":              ["Pediatría", "Médico pediatra"],
+    "Veterinarias":           ["Veterinario", "Clínica veterinaria"],
+    "Restaurantes":           ["Restaurant", "Comida", "Almuerzo"],
+    "Cafeterías":             ["Café", "Coffee shop"],
+    "Pizzerías":              ["Pizza", "Pizzería"],
+    "Hamburgueserías":        ["Hamburguesas", "Burger"],
+    "Panaderías":             ["Pastelería", "Repostería"],
+    "Bares":                  ["Bar", "Taberna", "Cantina"],
+    "Sushi":                  ["Japonés", "Sushi bar"],
+    "Comida Vegana":          ["Restaurante vegano", "Comida saludable"],
+    "Talleres Mecánicos":     ["Mecánica automotriz", "Taller de carros"],
+    "Concesionarios":         ["Venta de carros", "Agencia de autos"],
+    "Venta de Repuestos":     ["Repuestos", "Autopartes"],
+    "Lavado de Autos":        ["Car wash", "Autolavado", "Lavadero"],
+    "Motos":                  ["Motocicletas", "Venta de motos"],
+    "Inmobiliarias":          ["Bienes raíces", "Finca raíz", "Arriendos"],
+    "Constructoras":          ["Construcción", "Contratista"],
+    "Ferreterías":            ["Materiales de construcción"],
+    "Reformas":               ["Remodelaciones", "Acabados"],
+    "Cerrajeros":             ["Cerrajería"],
+    "Mueblerías":             ["Muebles"],
+    "Peluquerías":            ["Salón de belleza", "Estilista"],
+    "Barberías":              ["Barbería", "Barbero"],
+    "Spas":                   ["Centro de bienestar", "Masajes"],
+    "Centros de Uñas":        ["Manicure", "Uñas acrílicas"],
+    "Gimnasios":              ["Gym", "Fitness", "Centro deportivo"],
+    "Yoga":                   ["Yoga studio", "Pilates"],
+    "Tatuajes":               ["Estudio de tatuajes", "Piercing"],
+    "Abogados":               ["Bufete", "Estudio jurídico"],
+    "Contadores":             ["Contador público", "Asesor contable"],
+    "Notarías":               ["Notario"],
+    "Agencias de Seguros":    ["Seguros", "Aseguradora"],
+    "Agencias de Marketing":  ["Marketing digital", "Publicidad"],
+    "Logística":              ["Transporte", "Courier"],
+    "Mantenimiento":          ["Plomería", "Electricista", "Servicios del hogar"],
+    "Control de Plagas":      ["Fumigación"],
+    "Colegios":               ["Institución educativa", "Escuela"],
+    "Jardines Infantiles":    ["Preescolar", "Guardería"],
+    "Academias de Idiomas":   ["Clases de inglés", "Escuela de idiomas"],
+    "Escuelas de Conducción": ["Autoescuela", "Clases de manejo"],
+    "Reparación de Celulares":["Servicio técnico celulares"],
+    "Soporte Técnico":        ["Técnico de sistemas", "Servicio técnico PC"],
+    "Desarrollo Web":         ["Páginas web", "Diseño web"],
+    "CCTV":                   ["Cámaras de seguridad"],
+    "Tiendas de Ropa":        ["Boutique", "Ropa"],
+    "Zapaterías":             ["Calzado"],
+    "Joyerías":               ["Bisutería"],
+    "Tiendas Deportivas":     ["Artículos deportivos"],
+    "Peluquería Canina":      ["Dog grooming", "Peluquería para perros"],
+    "Tiendas de Mascotas":    ["Pet shop"],
+    "Hoteles":                ["Hospedaje", "Hostal"],
+    "Salones de Eventos":     ["Salón de fiestas"],
+    "Fotógrafos":             ["Estudio fotográfico"],
+    "Agencias de Viajes":     ["Tour operador", "Viajes"],
+    "Seguridad Privada":      ["Vigilancia"],
+    "Mensajería":             ["Delivery", "Paquetería"],
+    "Mudanzas":               ["Fletes"],
+    "Imprentas":              ["Litografía", "Papelería"],
+    "Empresas locales":       ["Negocios locales"],
+    "Servicios profesionales":["Profesionales independientes"],
+}
+
+_NIVEL_CONFIG = {
+    "⚡ Rápido  (1 punto)":     {"grid_n": 1,  "label": "1 punto"},
+    "🏙️ Normal  (9 puntos)":    {"grid_n": 3,  "label": "9 GPS"},
+    "🗺️ Amplio  (25 puntos)":   {"grid_n": 5,  "label": "25 GPS"},
+    "🌍 Máximo  (49 puntos)":   {"grid_n": 7,  "label": "49 GPS"},
 }
 
 COUNTRY_CODES = {
@@ -148,7 +227,7 @@ st.markdown("""
 # Sidebar
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND <br><small style='color:gray;font-size:12px;'>v2.0.0</small></h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='neon-text' style='text-align:center;'>CENTRAL COMMAND <br><small style='color:gray;font-size:12px;'>v2.1.0</small></h2>", unsafe_allow_html=True)
     st.divider()
     modo_escaneo = st.selectbox("MODO DE ESCANEO:", ["🎯 Caza-Sitios (Solo SIN web)", "📈 SEO Audit (Solo CON web)", "🔎 Full Scan (Todo)"])
 
@@ -157,31 +236,45 @@ with st.sidebar:
         depto       = st.selectbox("ESTADO", sorted(GEO_DATA[pais_sel].keys()))
         ciudad_base = st.selectbox("CIUDAD", sorted(GEO_DATA[pais_sel][depto]))
         st.divider()
-        tipo_zona = st.radio("COBERTURA:", [
-            "📍 TODA LA CIUDAD",
-            "🌐 AUTO-COBERTURA (12 zonas)",
-            "📍 CENTRO", "⬆️ NORTE", "⬇️ SUR",
-            "🧩 BARRIOS MANUALES",
-        ])
-        if tipo_zona == "🧩 BARRIOS MANUALES":
-            barrios = [b.strip() for b in st.text_area("LISTA DE BARRIOS (uno por línea):", "Zona 1").split("\n") if b.strip()]
-        elif tipo_zona == "📍 TODA LA CIUDAD":
-            barrios = [""]
-        elif tipo_zona == "🌐 AUTO-COBERTURA (12 zonas)":
-            barrios = AUTO_ZONAS
-            st.info(f"🗺️ {len(AUTO_ZONAS)} zonas × nichos = cobertura máxima")
+        has_coords = ciudad_base in CITY_COORDS
+        nivel = st.select_slider(
+            "COBERTURA:",
+            options=list(_NIVEL_CONFIG.keys()),
+            value="🏙️ Normal  (9 puntos)",
+        )
+        usar_manual = st.checkbox("🧩 Barrios manuales", False)
+
+        if usar_manual:
+            barrios = [b.strip() for b in st.text_area("BARRIOS (uno por línea):", "Zona 1").split("\n") if b.strip()]
         else:
-            barrios = [tipo_zona.replace("📍 ", "").replace("⬆️ ", "").replace("⬇️ ", "")]
+            _grid_n = _NIVEL_CONFIG[nivel]["grid_n"]
+            if _grid_n == 1:
+                barrios = [""]
+                st.caption("📍 Búsqueda general en toda la ciudad")
+            else:
+                _grid = generate_grid(ciudad_base, grid_n=_grid_n) if has_coords else None
+                if _grid:
+                    barrios = _grid
+                    st.success(f"📡 {len(_grid)} puntos GPS · {ciudad_base}")
+                else:
+                    barrios = AUTO_ZONAS
+                    st.warning(f"⚠️ {ciudad_base} sin coordenadas — usando {len(AUTO_ZONAS)} zonas de texto")
 
     with st.expander("🎯 NICHO Y SECTOR", expanded=True):
         cat       = st.selectbox("CATEGORÍA:", list(NICHOS_DICT.keys()))
         sub       = st.selectbox("NICHO:",     NICHOS_DICT[cat])
         exhaustivo = st.toggle("🚀 EXHAUSTIVO TOTAL (+250)", False)
+        usar_sinonimos = st.toggle("🔄 Sinónimos (búsqueda ampliada)", True)
         nicho = "MODO_EXHAUSTIVO_TOTAL" if exhaustivo else (f"SECTOR_{cat}" if "TODOS" in sub else sub)
+        extra_terms = NICHO_SYNONYMS.get(sub, []) if usar_sinonimos and not exhaustivo and "TODOS" not in sub else []
 
     max_res = st.number_input("CAPACIDAD:", 5, 5000, 50)
     infinito = st.toggle("♾️ ILIMITADO", False)
     st.divider()
+    _n_terms = 1 + len(extra_terms)
+    _n_zones = len(barrios) if barrios else 1
+    _est = _n_zones * _n_terms
+    st.caption(f"🔍 Estimado: {_n_zones} zonas × {_n_terms} término(s) = **{_est} búsquedas**")
     c1, c2 = st.columns(2)
     start_btn = c1.button("🚀 INICIAR", type="primary")
     stop_btn  = c2.button("🛑 PARAR")
@@ -353,7 +446,7 @@ if start_btn:
             _run_async(main_loop(
                 nicho, ciudad_base, pais_sel, barrios,
                 max_res, infinito, modo_escaneo,
-                st, NICHOS_DICT, live_c, progress_bar,
+                st, NICHOS_DICT, live_c, progress_bar, extra_terms,
             ))
         except Exception as e:
             import traceback
