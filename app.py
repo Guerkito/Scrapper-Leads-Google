@@ -1,5 +1,6 @@
 import streamlit as st
 import asyncio
+import threading
 import pandas as pd
 from playwright.async_api import async_playwright
 import playwright_stealth
@@ -10,6 +11,22 @@ import re
 from geo_data import GEO_DATA
 import time
 import os
+
+def _run_async(coro):
+    """Ejecuta una coroutine en un thread separado con su propio event loop.
+    Evita conflictos con el event loop interno de Streamlit."""
+    result = {}
+    def _target():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result['value'] = loop.run_until_complete(coro)
+        finally:
+            loop.close()
+    t = threading.Thread(target=_target)
+    t.start()
+    t.join()
+    return result.get('value')
 
 # --- INITIALIZE STATE ---
 if 'stop_requested' not in st.session_state: st.session_state.stop_requested = False
@@ -302,15 +319,23 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val, inf
                         rev_num = "".join(filter(str.isdigit, rev_raw)) or "0"
                 except: pass
 
-                tipo_el = await page.query_selector('button[class*="Dener"]')
-                tipo_txt = await tipo_el.inner_text() if tipo_el else nicho_val
+                tipo_txt = nicho_val
+                for _sel in ['button[class*="Dener"]', 'button[jsaction*="category"]', 'button[class*="DkEaL"]']:
+                    _el = await page.query_selector(_sel)
+                    if _el:
+                        _txt = await _el.inner_text()
+                        if _txt and _txt.strip():
+                            tipo_txt = _txt.strip()
+                            break
 
                 save_lead({"Nombre": name, "Teléfono": phone, "Rating": r_num, "Reseñas": rev_num, "Tipo": tipo_txt, "Lat": lat, "Lng": lng, "Zona": query, "Ciudad": city, "Pais": country, "Nicho": nicho_val, "Web": w_url, "Maps_URL": maps_url})
                 found += 1
                 st.session_state.total_session += 1
                 live_counter.markdown(f"<div style='background:#111;border:2px solid #39FF14;border-radius:15px;padding:15px;text-align:center'><h1 style='margin:0;color:#39FF14'>{st.session_state.total_session} LEADS</h1></div>", unsafe_allow_html=True)
                 log_area.write(f"✅ CAPTURADO: {name}")
-            except: continue
+            except Exception as _e:
+                    log_area.write(f"⚠️ Error procesando elemento {audited}: {_e}")
+                    continue
     finally:
         await page.close()
         return found
@@ -367,14 +392,16 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
                     except Exception as e:
                         st.warning(f"⚠️ Error en zona {query}: {e}")
             
-            await browser.close()
             st.session_state.last_summary = {'leads': leads_sesion}
         except Exception as e:
             st.error(f"❌ ERROR DURANTE EL ESCANEO: {e}")
             import traceback
             st.code(traceback.format_exc())
         finally:
-            if 'browser' in locals(): await browser.close()
+            try:
+                await browser.close()
+            except Exception:
+                pass
 
 if start_btn:
     st.session_state.last_summary = None
@@ -383,7 +410,7 @@ if start_btn:
     live_c = log_container.empty()
     with st.expander("📄 Logs de Prospección", expanded=True):
         try:
-            asyncio.run(main_loop(nicho, ciudad_base, pais_sel, barrios, max_res, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
+            _run_async(main_loop(nicho, ciudad_base, pais_sel, barrios, max_res, infinito, modo_escaneo, st, NICHOS_DICT, live_c))
         except Exception as e:
             st.error(f"Hubo un fallo inesperado: {e}")
     if st.session_state.last_summary:
