@@ -40,10 +40,15 @@ COUNTRY_CODES = {
 # ---------------------------------------------------------------------------
 def _run_async(coro):
     """Ejecuta una coroutine en un thread con su propio event loop.
-    Propaga cualquier excepción del thread al hilo principal."""
+    Propaga el contexto de Streamlit (necesario para st.write, st.toast, etc.)
+    y re-lanza cualquier excepción del thread al hilo principal."""
+    from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+    ctx = get_script_run_ctx()
     result = {}
     exc_holder = [None]
     def _target():
+        if ctx:
+            add_script_run_ctx(threading.current_thread(), ctx)
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
