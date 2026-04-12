@@ -4,7 +4,7 @@ beautifulsoup4==4.14.3
 streamlit==1.55.0
 pydeck
 folium==0.20.0
-streamlit-folium==0.27.1
+streamlit-folium==0.26.2
 playwright-stealth
 altair==6.0.0
 watchdog==6.0.0
