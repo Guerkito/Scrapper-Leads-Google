@@ -1,10 +1,20 @@
 import asyncio
+import random
 import re
 import urllib.parse
 import streamlit as st
 import playwright_stealth
 from playwright.async_api import async_playwright
 from db import save_lead, open_conn
+
+
+async def _is_captcha(page) -> bool:
+    """Detecta si Google ha presentado un captcha o página de bloqueo."""
+    url = page.url
+    if any(x in url for x in ("sorry/index", "consent.google", "recaptcha")):
+        return True
+    el = await page.query_selector('iframe[src*="recaptcha"], #captcha, form#captcha-form')
+    return el is not None
 
 MAX_CONCURRENT = 3  # páginas simultáneas máximas
 
@@ -73,6 +83,10 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val,
         except Exception:
             pass
 
+        if await _is_captcha(page):
+            log_area.write(f"🚨 CAPTCHA detectado en «{query}» — zona omitida")
+            return found
+
         while (infinito or found < max_results) and not st.session_state.stop_requested:
             if st.session_state.stop_requested:
                 break
@@ -82,7 +96,7 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val,
                 feed = await page.query_selector("div[role='feed']")
                 if feed:
                     await feed.evaluate("el => el.scrollBy(0, 1500)")
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(random.uniform(1.5, 3.0))
                     new_items = await page.query_selector_all("a.hfpxzc")
                     if len(new_items) == len(items):
                         break
@@ -106,12 +120,12 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val,
                     if not name:
                         break
                     await item.scroll_into_view_if_needed()
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(random.uniform(0.3, 0.9))
                     try:
                         await item.click(timeout=5000, force=True)
                     except Exception:
                         await item.evaluate("el => el.click()")
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(random.uniform(0.8, 1.6))
 
                     maps_url = page.url
                     w_url = "Sin sitio web"

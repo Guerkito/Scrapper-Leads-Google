@@ -65,6 +65,35 @@ def _run_async(coro):
     return result.get('value')
 
 
+AUTO_ZONAS = [
+    "Centro", "Norte", "Sur", "Este", "Oeste",
+    "Noreste", "Noroeste", "Sureste", "Suroeste",
+    "Zona Industrial", "Zona Comercial", "Zona Residencial",
+]
+
+@st.cache_data(ttl=10)
+def load_all_leads():
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT * FROM leads", conn)
+    conn.close()
+    return df
+
+
+def get_score(row):
+    """Lead scoring automático basado en rating, reseñas y teléfono."""
+    try:
+        rating  = float(str(row.get('rating',  '0')).split('/')[0].strip().replace(',', '.'))
+        reviews = int("".join(filter(str.isdigit, str(row.get('reseñas', '0')))) or 0)
+    except Exception:
+        return "❄️ Frío"
+    has_phone = bool(row.get('telefono') and str(row.get('telefono')) not in ('N/A', '', 'None'))
+    if rating >= 4.3 and reviews >= 30 and has_phone:
+        return "🥇 Oro"
+    if rating >= 3.8 and reviews >= 10 and has_phone:
+        return "✅ Bueno"
+    return "❄️ Frío"
+
+
 def get_wa_link(row, country_name):
     tel = str(row['telefono']) if row['telefono'] else ""
     num = "".join(filter(str.isdigit, tel))
@@ -128,11 +157,19 @@ with st.sidebar:
         depto       = st.selectbox("ESTADO", sorted(GEO_DATA[pais_sel].keys()))
         ciudad_base = st.selectbox("CIUDAD", sorted(GEO_DATA[pais_sel][depto]))
         st.divider()
-        tipo_zona = st.radio("COBERTURA:", ["📍 TODA LA CIUDAD", "📍 CENTRO", "⬆️ NORTE", "⬇️ SUR", "🧩 BARRIOS"])
-        if tipo_zona == "🧩 BARRIOS":
-            barrios = st.text_area("LISTA DE BARRIOS:", "Zona 1").split("\n")
+        tipo_zona = st.radio("COBERTURA:", [
+            "📍 TODA LA CIUDAD",
+            "🌐 AUTO-COBERTURA (12 zonas)",
+            "📍 CENTRO", "⬆️ NORTE", "⬇️ SUR",
+            "🧩 BARRIOS MANUALES",
+        ])
+        if tipo_zona == "🧩 BARRIOS MANUALES":
+            barrios = [b.strip() for b in st.text_area("LISTA DE BARRIOS (uno por línea):", "Zona 1").split("\n") if b.strip()]
         elif tipo_zona == "📍 TODA LA CIUDAD":
             barrios = [""]
+        elif tipo_zona == "🌐 AUTO-COBERTURA (12 zonas)":
+            barrios = AUTO_ZONAS
+            st.info(f"🗺️ {len(AUTO_ZONAS)} zonas × nichos = cobertura máxima")
         else:
             barrios = [tipo_zona.replace("📍 ", "").replace("⬆️ ", "").replace("⬇️ ", "")]
 
@@ -156,9 +193,7 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 st.markdown("<h1 style='font-size: 2.2em; margin-bottom:0;'>LEAD GEN <span class='neon-text'>PRO ELITE</span></h1>", unsafe_allow_html=True)
 
-conn   = sqlite3.connect(DB_PATH)
-df_all = pd.read_sql_query("SELECT * FROM leads", conn)
-conn.close()
+df_all = load_all_leads()
 
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("🎯 OBJETIVO",  "∞" if infinito else max_res)
@@ -198,7 +233,8 @@ if search_txt: df_f = df_f[
 ]
 
 df_edit = df_f.copy().sort_values(by='id', ascending=False)
-df_edit['Chat'] = df_edit.apply(lambda r: get_wa_link(r, pais_sel), axis=1)
+df_edit['Chat']  = df_edit.apply(lambda r: get_wa_link(r, pais_sel), axis=1)
+df_edit['Score'] = df_edit.apply(get_score, axis=1)
 
 _COL_CFG = {
     "estado":   st.column_config.SelectboxColumn("Status", options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"]),
@@ -231,16 +267,18 @@ if view_mode == "🌓 DIVIDIDA":
     with cr:
         st.markdown(f"#### 📝 CRM ({len(df_f)} leads)")
         edited_df = st.data_editor(
-            df_edit[['id', 'estado', 'notas', 'nombre', 'rating', 'Chat', 'maps_url']],
+            df_edit[['id', 'Score', 'estado', 'notas', 'nombre', 'rating', 'Chat', 'maps_url']],
             column_config=_COL_CFG,
-            disabled=["nombre", "rating", "Chat", "maps_url"],
+            disabled=["nombre", "rating", "Chat", "maps_url", "Score"],
             hide_index=True, width="stretch", height=500,
         )
         if st.button("💾 GUARDAR CRM", type="primary"):
             conn = sqlite3.connect(DB_PATH)
             for _, r in edited_df.iterrows():
                 conn.execute("UPDATE leads SET estado=?, notas=? WHERE id=?", (r['estado'], r['notas'], r['id']))
-            conn.commit(); conn.close(); st.rerun()
+            conn.commit(); conn.close()
+            load_all_leads.clear()
+            st.rerun()
 
 elif view_mode == "🗺️ MAPA FULL":
     map_data = df_f.dropna(subset=['lat', 'lng']).copy()
@@ -263,16 +301,18 @@ elif view_mode == "🗺️ MAPA FULL":
 
 elif view_mode == "📝 CRM FULL":
     edited_df = st.data_editor(
-        df_edit[['id', 'estado', 'notas', 'nombre', 'rating', 'reseñas', 'tipo', 'Chat', 'web', 'maps_url', 'nicho', 'fecha', 'ciudad']],
+        df_edit[['id', 'Score', 'estado', 'notas', 'nombre', 'rating', 'reseñas', 'tipo', 'Chat', 'web', 'maps_url', 'nicho', 'fecha', 'ciudad']],
         column_config=_COL_CFG,
-        disabled=["nombre", "rating", "reseñas", "tipo", "Chat", "web", "maps_url", "nicho", "fecha", "ciudad"],
+        disabled=["nombre", "rating", "reseñas", "tipo", "Chat", "web", "maps_url", "nicho", "fecha", "ciudad", "Score"],
         hide_index=True, width="stretch", height=700,
     )
     if st.button("💾 GUARDAR CAMBIOS CRM FULL", type="primary"):
         conn = sqlite3.connect(DB_PATH)
         for _, r in edited_df.iterrows():
             conn.execute("UPDATE leads SET estado=?, notas=? WHERE id=?", (r['estado'], r['notas'], r['id']))
-        conn.commit(); conn.close(); st.rerun()
+        conn.commit(); conn.close()
+        load_all_leads.clear()
+        st.rerun()
 
 # ---------------------------------------------------------------------------
 # Export & Admin
@@ -289,11 +329,12 @@ with ec2:
     with st.expander("⚙️ ADMIN DB"):
         if st.button("⚡ COMPACTAR DB", use_container_width=True):
             conn = sqlite3.connect(DB_PATH); conn.execute("VACUUM"); conn.close()
-            st.success("Compactada")
+            load_all_leads.clear(); st.success("Compactada")
         if st.button("🗑️ BORRAR TODO", use_container_width=True):
             if st.session_state.get('confirm_del', False):
                 conn = sqlite3.connect(DB_PATH)
                 conn.execute("DELETE FROM leads"); conn.commit(); conn.close()
+                load_all_leads.clear()
                 st.session_state.confirm_del = False; st.rerun()
             else:
                 st.warning("¿Seguro?"); st.session_state.confirm_del = True
