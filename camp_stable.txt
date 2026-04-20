@@ -1,0 +1,74 @@
+    # ── Configuración Evolution API en el sidebar ──
+    with st.sidebar:
+        st.divider()
+        st.markdown("### 🔌 Conexión WhatsApp")
+        
+        # Usamos la IP de WSL o localhost
+        evo_url = st.text_input("URL Evolution", "http://localhost:8090", help="Si usas ngrok, pega aquí la URL https")
+        evo_key = st.text_input("API Key", "", type="password")
+        evo_instance = "onyxbot" # Forzamos nombre simple
+
+        st.markdown("---")
+        st.markdown(f"**1. Abre el panel oficial:**")
+        st.markdown(f"[👉 CLICK AQUÍ PARA VINCULAR QR]({evo_url}/manager)")
+        st.caption("Entra con tu API Key y vincula el celular ahí. Es 100% seguro.")
+
+        if st.button("🔄 Verificar Conexión"):
+            try:
+                headers = {"apikey": evo_key, "ngrok-skip-browser-warning": "true"}
+                r = requests.get(f"{evo_url}/instance/connectionState/{evo_instance}", headers=headers, timeout=5)
+                if r.status_code == 200:
+                    state = r.json().get('instance', {}).get('state')
+                    if state == 'open': st.success("✅ Conectado")
+                    else: st.warning(f"⚠️ Estado: {state}")
+                else:
+                    st.info("Creando instancia...")
+                    requests.post(f"{evo_url}/instance/create", json={"instanceName": evo_instance, "token": evo_key, "integration": "WHATSAPP-BAILEYS", "qrcode": True}, headers=headers)
+                    st.rerun()
+            except:
+                st.error("No se detecta la API. ¿Está Docker encendido?")
+
+    st.markdown("### 🚀 Lanzador de Campañas")
+    
+    # Filtros de leads
+    df_camp = df_all.copy()
+    df_camp = df_camp[df_camp['telefono'].notna() & (df_camp['telefono'] != 'N/A')]
+    df_camp = df_camp[df_camp['estado'] == 'Nuevo']
+    
+    if df_camp.empty:
+        st.info("No hay leads 'Nuevos' con teléfono.")
+    else:
+        # Lógica de envío simplificada
+        msg_template = st.text_area("Mensaje", "Hola {nombre}, un gusto saludarte.")
+        batch_size = st.number_input("Cantidad a enviar", 1, 50, 10)
+        lote = df_camp.head(batch_size)
+        
+        c1, c2 = st.columns(2)
+        if c1.button("🚀 INICIAR ENVÍO REAL", type="primary", use_container_width=True):
+            log_c = st.empty()
+            prog = st.progress(0)
+            for idx, (_, lead) in enumerate(lote.iterrows()):
+                mensaje = msg_template.replace("{nombre}", lead['nombre'])
+                num = "".join(filter(str.isdigit, str(lead['telefono'])))
+                if not num.startswith("57"): num = "57" + num # Ajuste auto Colombia
+                
+                log_c.write(f"Enviando a {lead['nombre']}...")
+                try:
+                    url = f"{evo_url}/message/sendText/{evo_instance}"
+                    headers = {"apikey": evo_key, "Content-Type": "application/json", "ngrok-skip-browser-warning": "true"}
+                    payload = {"number": num, "text": mensaje}
+                    requests.post(url, json=payload, headers=headers, timeout=10)
+                    
+                    conn = sqlite3.connect(DB_PATH)
+                    conn.execute("UPDATE leads SET estado='Contactado' WHERE id=?", (lead['id'],))
+                    conn.commit(); conn.close()
+                except:
+                    log_c.error(f"Fallo en {lead['nombre']}")
+                
+                prog.progress((idx+1)/len(lote))
+                time.sleep(random.randint(10, 20)) # Pausa corta para pruebas
+            st.success("Lote completado.")
+            load_all_leads.clear(); st.rerun()
+            
+        if c2.button("🛑 PARAR", use_container_width=True):
+            st.rerun()

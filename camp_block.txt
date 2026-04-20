@@ -1,0 +1,81 @@
+        if 'evo_instance_name' not in st.session_state:
+            st.session_state.evo_instance_name = "onyxbot"
+
+        evo_url_input = st.text_input("URL Evolution", "", placeholder="https://tu-tunel.ngrok-free.app")
+        evo_key       = st.text_input("API Key", "", type="password")
+        evo_instance  = st.text_input("Instancia", value=st.session_state.evo_instance_name).lower().strip()
+        st.session_state.evo_instance_name = evo_instance
+        
+        evo_url = evo_url_input.strip().rstrip("/")
+        
+        if st.button("📱 Panel de Conexión / QR", use_container_width=True):
+            if not evo_url or not evo_url.startswith("http"):
+                st.warning("⚠️ Pega la URL de ngrok primero.")
+            else:
+                st.session_state.show_qr = True
+
+        if evo_url:
+            st.markdown(f"[🔗 Abrir Manager Oficial de Evolution]({evo_url}/manager)", help="Si el QR no carga aquí, usa este panel oficial para vincular tu teléfono.")
+
+        if st.button("🔴 Eliminar Bot / Limpiar", use_container_width=True):
+            try:
+                headers = {"apikey": evo_key, "ngrok-skip-browser-warning": "true"}
+                requests.delete(f"{evo_url}/instance/logout/{evo_instance}", headers=headers)
+                requests.delete(f"{evo_url}/instance/delete/{evo_instance}", headers=headers)
+                st.success("✅ Servidor limpio.")
+                st.session_state.evo_instance_name = f"bot{random.randint(100,999)}"
+                st.rerun()
+            except: st.error("No se pudo borrar.")
+
+    st.markdown("<p style='font-family:Space Grotesk,sans-serif;font-size:0.7rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#6A6A7A;margin-bottom:12px;'>Campaña automatizada</p>", unsafe_allow_html=True)
+
+    if st.session_state.get('show_qr', False):
+        with st.container():
+            st.markdown("<div style='background:#16161E; padding:20px; border-radius:15px; border:2px solid #FF0000; text-align:center;'>", unsafe_allow_html=True)
+            st.subheader("🔗 Vinculación de WhatsApp")
+            try:
+                headers = {"apikey": evo_key, "Authorization": f"Bearer {evo_key}", "ngrok-skip-browser-warning": "true"}
+                qr_url = f"{evo_url}/instance/connect/{evo_instance}?apikey={evo_key}"
+                r = requests.get(qr_url, headers=headers, timeout=10)
+                
+                if r.status_code == 404:
+                    st.info("Configurando bot nuevo...")
+                    requests.post(f"{evo_url}/instance/create", json={"instanceName": evo_instance, "token": evo_key, "integration": "WHATSAPP-BAILEYS", "qrcode": True}, headers=headers, timeout=15)
+                    time.sleep(6); r = requests.get(qr_url, headers=headers, timeout=10)
+
+                if r.status_code == 200:
+                    data = r.json()
+                    status = data.get('instance', {}).get('status', 'unknown')
+                    qr_img = data.get('qrcode', {}).get('base64')
+
+                    if status == 'connected':
+                        st.success("✅ ¡WhatsApp vinculado con éxito!")
+                    elif qr_img:
+                        st.image(qr_img, width=300, caption="Escanea con tu celular")
+                    else:
+                        st.warning(f"Estado del motor: {status}")
+                        st.info("💡 El motor está iniciando. Si no sale el QR, usa el enlace 'Abrir Manager Oficial' en el sidebar.")
+                        if st.button("🔌 Forzar Reinicio del Motor"):
+                            requests.post(f"{evo_url}/instance/restart/{evo_instance}", headers=headers)
+                            st.rerun()
+                        
+                        st.markdown("---")
+                        st.write("**Vincular con Código**")
+                        c_pref = COUNTRY_CODES.get(pais_sel, "57")
+                        num_in = st.text_input("Número", placeholder=f"Ej: {c_pref}310...")
+                        if st.button("🔢 Generar Código"):
+                            if num_in:
+                                clean_n = "".join(filter(str.isdigit, num_in))
+                                if not clean_n.startswith(c_pref): clean_n = c_pref + clean_n
+                                # Intentamos la ruta que la API v2 prefiere
+                                rp = requests.get(f"{evo_url}/instance/connect/pairing/{evo_instance}?number={clean_n}", headers=headers)
+                                if rp.status_code == 200:
+                                    st.code(rp.json().get('code'), language="text")
+                                    st.write("Pon este código en tu WhatsApp.")
+                                else:
+                                    st.error(f"Error {rp.status_code}: Prueba el 'Manager Oficial' en el sidebar.")
+                            else: st.warning("Escribe el número.")
+                else: st.error(f"API: {r.text}")
+            except Exception as e: st.error(f"Error: {e}")
+            if st.button("Cerrar Ventana"): st.session_state.show_qr = False; st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)

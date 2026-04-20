@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.pytest_cache/
+
+# Streamlit
+.streamlit/
+
+# Environment
+.env
+
+# Local tools
+.claude/
+
+# Data and Logs
+data/
+leads.db
+*.csv
+debug_maps.png
+logs/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
