@@ -13,12 +13,14 @@ from db import save_lead, open_conn, save_search_history, load_known_identifiers
 MAX_CONCURRENT = 5
 
 BROWSER_ARGS = [
-    '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-    '--disable-gpu', '--no-zygote', '--single-process',
+    '--no-sandbox', 
+    '--disable-setuid-sandbox', 
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
     '--disable-blink-features=AutomationControlled',
-    '--disable-extensions', '--disable-infobars',
-    '--disable-browser-side-navigation',
     '--disable-features=IsolateOrigins,site-per-process',
+    '--dns-prefetch-disable',
+    '--no-first-run',
 ]
 
 _RATING_SELECTORS = [
@@ -62,15 +64,17 @@ def _extract_place_id(url: str) -> str | None:
     return m.group(1) if m else None
 
 
-async def _wait_for_panel(page, name: str, timeout_ms: int = 4000):
+async def _wait_for_panel(page, name: str, timeout_ms: int = 4000, stop_check=lambda: False):
     """Espera a que el panel lateral cargue el negocio. Fallback a sleep."""
     for sel in _PANEL_LOADED_SELECTORS:
+        if stop_check(): return
         try:
             await page.wait_for_selector(sel, timeout=timeout_ms)
             return
         except Exception:
             continue
-    await asyncio.sleep(1.0)   # fallback
+    if not stop_check():
+        await asyncio.sleep(1.0)   # fallback
 
 
 async def _is_captcha(page) -> bool:
@@ -81,7 +85,7 @@ async def _is_captcha(page) -> bool:
     return el is not None
 
 
-async def _scroll_and_wait(page, current_count: int, max_wait: float = 5.0) -> int:
+async def _scroll_and_wait(page, current_count: int, max_wait: float = 5.0, stop_check=lambda: False) -> int:
     """
     Hace scroll en el feed y espera de forma reactiva hasta que aparezcan
     nuevos items (o se alcance max_wait segundos). Retorna el nuevo total.
@@ -92,6 +96,7 @@ async def _scroll_and_wait(page, current_count: int, max_wait: float = 5.0) -> i
     await feed.evaluate("el => el.scrollBy(0, 1800)")
     t0 = asyncio.get_event_loop().time()
     while asyncio.get_event_loop().time() - t0 < max_wait:
+        if stop_check(): break
         await asyncio.sleep(0.4)
         new_items = await page.query_selector_all("a.hfpxzc")
         if len(new_items) > current_count:
@@ -99,9 +104,10 @@ async def _scroll_and_wait(page, current_count: int, max_wait: float = 5.0) -> i
     return current_count
 
 
-async def _is_end_of_results(page) -> bool:
+async def _is_end_of_results(page, stop_check=lambda: False) -> bool:
     """Detecta si Google Maps indica que no hay más resultados."""
     for sel in _NO_MORE_SELECTORS:
+        if stop_check(): break
         try:
             el = await page.query_selector(sel)
             if el:
@@ -109,7 +115,8 @@ async def _is_end_of_results(page) -> bool:
                 if any(k in txt for k in ("todos los result", "no result", "no hay result",
                                            "no se encontr", "no more", "end of result")):
                     return True
-        except Exception:
+        except Exception as e:
+            # Silencio esperado si no hay indicador de fin, pero logueamos para debug
             pass
     return False
 
@@ -117,7 +124,7 @@ async def _is_end_of_results(page) -> bool:
 # ── Función principal de zona ─────────────────────────────────────────────────
 
 async def scrape_zone(context, query, max_results, city, country, nicho_val,
-                      infinito, modo_escaneo, log_area, live_counter, db_conn,
+                      infinito, modo_escaneo, log_area, live_counter, db_conn, db_lock,
                       known_names: set, known_place_ids: set, seen_run: set):
     """
     Raspa una zona/query de Google Maps.
@@ -158,6 +165,7 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val,
         try:
             await page.click('button:has-text("Aceptar")', timeout=5000)
         except Exception:
+            # Es normal que no aparezca el botón de Aceptar en todas las cargas
             pass
 
         if await _is_captcha(page):
@@ -243,6 +251,7 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val,
                                     w_url = raw
                                 break
                     except Exception:
+                        # Error silencioso en extracción de campos opcionales del panel lateral
                         pass
 
                     tiene_w = w_url != "Sin sitio web"
@@ -293,6 +302,7 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val,
                                 rev_num = "".join(filter(str.isdigit, rev_raw)) or "0"
                                 break
                     except Exception:
+                        # Error silencioso en extracción de campos opcionales del panel lateral
                         pass
 
                     # ── Tipo / Categoría ──────────────────────────────────────
@@ -306,13 +316,14 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val,
                                 break
 
                     # ── NIVEL 3: INSERT OR IGNORE en DB ───────────────────────
-                    is_new = save_lead({
-                        "Nombre": name, "Teléfono": phone, "Rating": r_num,
-                        "Reseñas": rev_num, "Tipo": tipo_txt, "Lat": lat, "Lng": lng,
-                        "Zona": query, "Ciudad": city, "Pais": country,
-                        "Nicho": nicho_val, "Web": w_url, "Maps_URL": maps_url,
-                    }, db_conn)
-                    db_conn.commit()
+                    async with db_lock:
+                        is_new = save_lead({
+                            "Nombre": name, "Teléfono": phone, "Rating": r_num,
+                            "Reseñas": rev_num, "Tipo": tipo_txt, "Lat": lat, "Lng": lng,
+                            "Zona": query, "Ciudad": city, "Pais": country,
+                            "Nicho": nicho_val, "Web": w_url, "Maps_URL": maps_url,
+                        }, db_conn)
+                        db_conn.commit()
 
                     if is_new:
                         found += 1
@@ -381,6 +392,7 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
             viewport={'width': 1280, 'height': 720},
         )
         db_conn = open_conn()
+        db_lock = asyncio.Lock()
 
         try:
             # ── Cargar identificadores ya conocidos (una sola vez) ────────────
@@ -422,10 +434,11 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
                     log_area.write(f"Escaneando: {ni} @ {label}")
                     found, dupes = await scrape_zone(
                         context, query, max_r, city_base, p, ni,
-                        infinito, modo_escaneo, log_area, live_counter, db_conn,
+                        infinito, modo_escaneo, log_area, live_counter, db_conn, db_lock,
                         known_names, known_place_ids, seen_run,
                     )
-                    save_search_history(city_base, p, ni, label, found, dupes, db_conn)
+                    async with db_lock:
+                        save_search_history(city_base, p, ni, label, found, dupes, db_conn)
                     return (found, dupes)
 
             results      = await asyncio.gather(*[_run_zone(b, ni) for b, ni in all_zones], return_exceptions=True)
@@ -443,4 +456,5 @@ async def main_loop(n, city_base, p, barrios_list, max_r, infinito, modo_escaneo
             try:
                 await browser.close()
             except Exception:
+                # El navegador puede estar ya cerrado
                 pass

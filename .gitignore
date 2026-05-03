@@ -20,6 +20,9 @@ data/
 leads.db
 *.csv
 debug_maps.png
+debug_amarillas.*
+*.log
+*.out
 logs/
 
 # IDEs

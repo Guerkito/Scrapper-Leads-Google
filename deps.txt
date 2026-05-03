@@ -11,3 +11,7 @@ watchdog==6.0.0
 pyarrow==23.0.1
 requests
 python-dotenv
+httpx
+loguru
+xlsxwriter
+pytest

@@ -3,75 +3,101 @@ import json
 import sqlite3
 import os
 import requests
+import datetime
+import time
+import random
 from dotenv import load_dotenv
+from db import DB_PATH, init_db, open_conn
+from loguru import logger
 
-# Cargar configuración desde .env
+# Configurar Loguru
+logger.add("data/logs/webhook.log", rotation="10 MB", level="INFO")
+
 load_dotenv()
+init_db() 
 
-PORT = int(os.getenv("PORT", 5001))
-DB_PATH = os.getenv("DB_PATH", "data/leads.db")
-EVO_URL = os.getenv("EVO_URL", "http://localhost:8080")
-EVO_API_KEY = os.getenv("EVO_API_KEY", "")
+PORT = int(os.getenv("WEBHOOK_PORT", 5001))
+EVO_URL = os.getenv("EVO_URL", "http://127.0.0.1:8080")
+EVO_API_KEY = os.getenv("EVO_API_KEY", "OnyxSecret2026")
 EVO_INSTANCE = os.getenv("EVO_INSTANCE", "onyxbot")
+OLLAMA_CHAT_URL = os.getenv("OLLAMA_CHAT_URL", "http://127.0.0.1:11434/api/chat")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
 
-# Configuración de Ollama
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+PROMPTS_POR_SECTOR = {
+    "educacion": """Eres un asesor de marketing digital de Onyx. Estás hablando con un colegio.
+Tu objetivo: entender si el colegio necesita mejorar su presencia digital para atraer más familias. 
+Pregunta por: número de estudiantes, si tienen web actualizada, si hacen publicidad digital.
+REGLAS: máximo 2 líneas por mensaje, tono profesional pero cercano, no uses signos de admiración. Tutea siempre.""",
+    
+    "alimentos": """Eres un asesor de marketing digital de Onyx. Estás hablando con una empresa de alimentos/procesadora. 
+Tu objetivo: entender si necesitan presencia B2B online para llegar a distribuidores. 
+Pregunta por: si venden a supermercados, si tienen catálogo digital, si buscan expandirse a otras ciudades.
+REGLAS: máximo 2 líneas por mensaje, tono empresarial directo. Tutea siempre.""",
+    
+    "medio_ambiente": """Eres un asesor de Onyx. Estás hablando con una empresa de tratamiento de aguas.
+Tu objetivo: entender si necesitan un sitio web para conseguir más contratos con industrias. 
+Pregunta por: tipo de clientes que tienen, si consiguen clientes por referidos, si tienen presencia en LinkedIn.
+REGLAS: máximo 2 líneas, tono técnico-profesional. Tutea siempre.""",
+    
+    "general": """Eres el asesor senior de Onyx, agencia de desarrollo de software en Colombia. 
+Tu objetivo es calificar leads y agendar llamadas de 20 min.
+REGLAS: máximo 2 líneas, tutea, tono colombiano profesional y directo. 
+Nunca uses signos de admiración ni frases cliché como 'juntos podemos'."""
+}
 
-def get_lead_info(phone):
-    """Busca info del lead en la DB por teléfono (limpio)."""
-    if not os.path.exists(DB_PATH): return None
+def get_system_prompt(lead_data: dict) -> str:
+    sector = lead_data.get("sector", "general").lower() if lead_data else "general"
+    return PROMPTS_POR_SECTOR.get(sector, PROMPTS_POR_SECTOR["general"])
+
+def get_lead_context(remote_jid):
+    """Recupera el contexto del lead desde la DB usando su WhatsApp ID."""
+    num = "".join(filter(str.isdigit, remote_jid))
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = open_conn()
         conn.row_factory = sqlite3.Row
         cursor = conn.execute(
-            "SELECT * FROM leads WHERE telefono LIKE ? ORDER BY id DESC LIMIT 1",
-            (f"%{phone}%",)
+            "SELECT * FROM leads WHERE telefono LIKE ? OR whatsapp_id = ? LIMIT 1",
+            (f"%{num[-10:]}%", remote_jid)
         )
-        lead = cursor.fetchone()
+        row = cursor.fetchone()
         conn.close()
-        return lead
-    except: return None
-
-def update_lead_status_and_history(lead_id, status, history, bot_pause=1):
-    """Actualiza el estado y el historial del lead."""
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.execute(
-            "UPDATE leads SET estado=?, bot_pausado=?, historial_mensajes=? WHERE id=?",
-            (status, bot_pause, history, lead_id)
-        )
-        conn.commit(); conn.close()
+        return dict(row) if row else None
     except Exception as e:
-        print(f"Error guardando historial: {e}")
+        logger.error(f"Error recuperando contexto: {e}")
+        return None
 
-def get_system_prompt():
-    """Lee el prompt de instrucciones desde el archivo de texto."""
-    try:
-        with open("bot_prompt.txt", "r", encoding="utf-8") as f:
-            return f.read()
-    except Exception:
-        # Fallback de emergencia por si el archivo no existe
-        return "Responde como experto en marketing para {nombre} de {nicho}. Historial:\n{historial}\n\nMensaje: {mensaje}\nTu respuesta:"
+def parse_history(hist_str):
+    messages = []
+    if not hist_str: return messages
+    lines = hist_str.strip().split('\n')
+    for line in lines:
+        if line.startswith('Usuario: '):
+            messages.append({"role": "user", "content": line.replace('Usuario: ', '').strip()})
+        elif line.startswith('Onyx: '):
+            messages.append({"role": "assistant", "content": line.replace('Onyx: ', '').strip()})
+    return messages[-14:]
 
-def ask_ollama(prompt):
-    """Consulta al modelo local de Ollama."""
+def ask_ollama(lead_data, message_now):
+    system_prompt = get_system_prompt(lead_data)
+    history_str = lead_data.get("historial_mensajes", "") if lead_data else ""
+    
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(parse_history(history_str))
+    messages.append({"role": "user", "content": message_now})
+
     payload = {
         "model": OLLAMA_MODEL,
-        "prompt": prompt,
+        "messages": messages,
         "stream": False,
-        "options": {
-            "temperature": 0.7, # Más creatividad para que suene natural
-            "num_predict": 100  # Respuestas cortas por WhatsApp
-        }
+        "options": {"temperature": 0.4, "num_ctx": 4096}
     }
+
     try:
-        response = requests.post(OLLAMA_URL, json=payload, timeout=40)
-        if response.status_code == 200:
-            return response.json().get("response", "").strip()
+        r = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=90)
+        return r.json().get("message", {}).get("content", "").strip().replace('"', '')
     except Exception as e:
-        print(f"⚠️ Error conectando con Ollama: {e}")
-    return None
+        logger.error(f"Error Ollama: {e}")
+        return "Hola, dame un momento y ya te atiendo personalmente."
 
 class WebhookHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
@@ -79,85 +105,63 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         post_data = self.rfile.read(content_length)
         
         try:
-            data = json.loads(post_data.decode('utf-8'))
-            
-            # Evitar responder a nuestros propios mensajes (fromMe)
-            if 'data' in data and data['data'].get('key', {}).get('fromMe', False) == True:
-                self.send_response(200)
-                self.end_headers()
-                return
-
-            # Detectar el remitente y el mensaje
-            sender = ""
-            msg_text = ""
-            
-            if 'data' in data:
-                sender = data['data'].get('key', {}).get('remoteJid', '') or data['data'].get('from', '')
+            data = json.loads(post_data)
+            # Manejar evento de mensaje de Evolution API
+            if data.get("event") == "messages.upsert":
+                msg_obj = data.get("data", {})
+                remote_jid = msg_obj.get("key", {}).get("remoteJid")
+                from_me = msg_obj.get("key", {}).get("fromMe")
                 
-                msg_obj = data['data'].get('message', {})
-                msg_text = msg_obj.get('conversation', '')
-                if not msg_text and msg_obj.get('extendedTextMessage'):
-                    msg_text = msg_obj.get('extendedTextMessage', {}).get('text', '')
-                if not msg_text:
-                    msg_text = data['data'].get('pushName', '')
-            
-            clean_number = "".join(filter(str.isdigit, sender.split('@')[0]))
-            
-            if clean_number and msg_text:
-                print(f"📩 Mensaje de {clean_number}: {msg_text[:50]}...")
-                
-                lead = get_lead_info(clean_number)
-                
-                if lead:
-                    name = lead['nombre']
-                    nicho = lead['nicho']
-                    historial_previo = lead['historial_mensajes'] or ""
-                    print(f"👤 Lead identificado: {name} ({nicho})")
+                if not from_me and remote_jid:
+                    text = msg_obj.get("message", {}).get("conversation") or \
+                           msg_obj.get("message", {}).get("extendedTextMessage", {}).get("text")
                     
-                    # 1. Agregar nuevo mensaje del cliente al historial
-                    nuevo_historial = f"{historial_previo}\n[Cliente]: {msg_text}".strip()
-                    
-                    # (Opcional) Limitar historial a las últimas 10 líneas para no ahogar a Ollama local
-                    lineas = nuevo_historial.split("\n")
-                    if len(lineas) > 10:
-                        nuevo_historial = "\n".join(lineas[-10:])
-                    
-                    # 2. Construir el prompt dinámico
-                    plantilla_prompt = get_system_prompt()
-                    prompt_final = plantilla_prompt.replace("{nombre}", name).replace("{nicho}", nicho).replace("{historial}", nuevo_historial).replace("{mensaje}", msg_text)
-                    
-                    print(f"🧠 Pensando respuesta con Ollama ({OLLAMA_MODEL})...")
-                    reply = ask_ollama(prompt_final)
-                    
-                    if reply:
-                        # Limpiar tics raros de la IA
-                        reply = reply.replace("[Onyx]:", "").replace("Onyx:", "").replace('"', "").strip()
+                    if text:
+                        logger.info(f"📩 Mensaje de {remote_jid}: {text}")
                         
-                        if send_whatsapp_msg(clean_number, reply):
-                            print(f"🤖 Bot respondió: {reply}")
-                            # 3. Guardar la respuesta del bot en el historial
-                            historial_final = f"{nuevo_historial}\n[Onyx]: {reply}"
-                            update_lead_status_and_history(lead['id'], "En Conversación", historial_final, 0)
-                        else:
-                            print(f"❌ Falló el envío de respuesta a {name}")
-                    else:
-                        print("⚠️ Ollama no respondió o está apagado. Pausando bot para este lead.")
-                        update_lead_status_and_history(lead['id'], "Respondido", nuevo_historial, 1)
-                
+                        # 1. Obtener contexto
+                        lead_ctx = get_lead_context(remote_jid)
+                        if lead_ctx:
+                            logger.info(f"🎯 Contexto detectado: Sector={lead_ctx.get('sector')}, Calif={lead_ctx.get('calificacion')}")
+                        
+                        # 2. Generar respuesta
+                        response_text = ask_ollama(lead_ctx, text)
+                        
+                        # 3. Enviar vía Evolution API
+                        send_payload = {
+                            "number": remote_jid.split("@")[0],
+                            "text": response_text
+                        }
+                        headers = {"apikey": EVO_API_KEY, "Content-Type": "application/json"}
+                        requests.post(f"{EVO_URL}/message/sendText/{EVO_INSTANCE}", 
+                                      json=send_payload, headers=headers)
+                        
+                        # 4. Actualizar historial en DB
+                        new_history = (lead_ctx.get("historial_mensajes") or "") + \
+                                      f"\nUsuario: {text}\nOnyx: {response_text}"
+                        
+                        try:
+                            conn = open_conn()
+                            conn.execute(
+                                "UPDATE leads SET historial_mensajes = ?, ultima_interaccion = ? WHERE id = ?",
+                                (new_history, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), lead_ctx['id'])
+                            )
+                            # También loguear en bot_logs
+                            conn.execute("INSERT INTO bot_logs (mensaje) VALUES (?)", 
+                                        (f"IA -> {lead_ctx['nombre']}: {response_text[:50]}...",))
+                            conn.commit()
+                            conn.close()
+                        except Exception as e:
+                            logger.error(f"Error actualizando historial: {e}")
+
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(b"OK")
-            
         except Exception as e:
-            print(f"❌ Error webhook: {e}")
+            logger.error(f"Error Webhook: {e}")
             self.send_response(500)
             self.end_headers()
 
-def run(server_class=http.server.HTTPServer, handler_class=WebhookHandler):
-    server_address = ('', PORT)
-    httpd = server_class(server_address, handler_class)
-    print(f"🚀 Webhook Inteligente (Ollama) escuchando en el puerto {PORT}...")
-    httpd.serve_forever()
-
 if __name__ == "__main__":
-    run()
+    server = http.server.HTTPServer(('0.0.0.0', PORT), WebhookHandler)
+    logger.info(f"🚀 Onyx Webhook v12.0 corriendo en puerto {PORT}")
+    server.serve_forever()
