@@ -44,7 +44,7 @@
         lote = df_camp.head(batch_size)
         
         c1, c2 = st.columns(2)
-        if c1.button("🚀 INICIAR ENVÍO REAL", type="primary", use_container_width=True):
+        if c1.button("🚀 INICIAR ENVÍO REAL", type="primary", width='stretch'):
             log_c = st.empty()
             prog = st.progress(0)
             for idx, (_, lead) in enumerate(lote.iterrows()):
@@ -70,5 +70,5 @@
             st.success("Lote completado.")
             load_all_leads.clear(); st.rerun()
             
-        if c2.button("🛑 PARAR", use_container_width=True):
+        if c2.button("🛑 PARAR", width='stretch'):
             st.rerun()

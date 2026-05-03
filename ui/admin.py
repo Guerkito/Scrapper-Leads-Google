@@ -22,7 +22,7 @@ def render_admin_view():
             "Exportar Leads (CSV)",
             df_all.to_csv(index=False),
             f"leads_onyx_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
-            use_container_width=True,
+            width='stretch',
             mime="text/csv"
         )
     
@@ -34,13 +34,13 @@ def render_admin_view():
                     f.read(),
                     f"backup_onyx_{datetime.datetime.now().strftime('%Y%m%d')}.db",
                     mime="application/octet-stream",
-                    use_container_width=True,
+                    width='stretch',
                 )
         else:
-            st.button("Backup no disponible", disabled=True, use_container_width=True)
+            st.button("Backup no disponible", disabled=True, width='stretch')
 
     with ex3:
-        if st.button("Compactar Base de Datos", use_container_width=True, help="Optimiza el espacio en disco de la DB"):
+        if st.button("Compactar Base de Datos", width='stretch', help="Optimiza el espacio en disco de la DB"):
             try:
                 conn = open_conn()
                 conn.execute("VACUUM")
@@ -59,7 +59,7 @@ def render_admin_view():
         st.markdown("<p style='font-size:0.8rem; color:#8888A0;'>Subir archivo <b>.db</b> (Reemplaza todo)</p>", unsafe_allow_html=True)
         uploaded_db = st.file_uploader("Subir base de datos", type=["db"], key="upload_db", label_visibility="collapsed")
         if uploaded_db:
-            if st.button("Restaurar Sistema desde .db", type="primary", use_container_width=True):
+            if st.button("Restaurar Sistema desde .db", type="primary", width='stretch'):
                 try:
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
                     tmp.write(uploaded_db.read())
@@ -86,7 +86,7 @@ def render_admin_view():
         st.markdown("<p style='font-size:0.8rem; color:#8888A0;'>Importar desde <b>CSV/Excel</b> (Fusiona datos)</p>", unsafe_allow_html=True)
         uploaded_file = st.file_uploader("Subir Excel o CSV", type=["csv", "xlsx"], key="upload_data", label_visibility="collapsed")
         if uploaded_file:
-            if st.button("Procesar e Importar Datos", type="primary", use_container_width=True):
+            if st.button("Procesar e Importar Datos", type="primary", width='stretch'):
                 try:
                     if uploaded_file.name.endswith('.csv'):
                         df_import = pd.read_csv(uploaded_file)
@@ -136,7 +136,7 @@ def render_admin_view():
             st.caption("Esto limpiará la tabla de leads pero mantendrá tus configuraciones y bot logs.")
             
         with col_p2:
-            if st.button("BORRAR TODO", type="primary", use_container_width=True):
+            if st.button("BORRAR TODO", type="primary", width='stretch'):
                 if st.session_state.get('confirm_full_delete', False):
                     conn = open_conn()
                     conn.execute("DELETE FROM leads")

@@ -56,14 +56,17 @@ def render_analytics_view(df_all):
 
     with g1:
         st.markdown("#### 📈 Embudo de Prospección")
-        status_counts = df['estado'].value_counts().reset_index()
-        status_counts.columns = ['Estado', 'Cantidad']
-        chart_funnel = alt.Chart(status_counts).mark_arc(innerRadius=60).encode(
-            theta=alt.Theta(field="Cantidad", type="quantitative"),
-            color=alt.Color(field="Estado", type="nominal", scale=alt.Scale(range=['#FF0000', '#6EB4C9', '#A06EC9', '#4ADE80', '#555568'])),
-            tooltip=['Estado', 'Cantidad']
-        ).properties(height=300)
-        st.altair_chart(chart_funnel, use_container_width=True)
+        if not df['estado'].dropna().empty:
+            status_counts = df['estado'].value_counts().reset_index()
+            status_counts.columns = ['Estado', 'Cantidad']
+            chart_funnel = alt.Chart(status_counts).mark_arc(innerRadius=60).encode(
+                theta=alt.Theta(field="Cantidad", type="quantitative"),
+                color=alt.Color(field="Estado", type="nominal", scale=alt.Scale(range=['#FF0000', '#6EB4C9', '#A06EC9', '#4ADE80', '#555568'])),
+                tooltip=['Estado', 'Cantidad']
+            ).properties(height=300)
+            st.altair_chart(chart_funnel, width='stretch')
+        else:
+            st.caption("Sin datos de estado disponibles.")
 
     with g2:
         st.markdown("#### 💻 Madurez Digital")
@@ -74,12 +77,15 @@ def render_analytics_view(df_all):
             'Píxel Google': len(df[df['pixel_google'] == True]),
         }
         tech_df = pd.DataFrame(list(tech_stats.items()), columns=['Métrica', 'Cantidad'])
-        chart_tech = alt.Chart(tech_df).mark_bar(color='#FF0000', cornerRadiusTopLeft=5, cornerRadiusTopRight=5).encode(
-            x=alt.X('Métrica:N', sort=None, title=None),
-            y=alt.Y('Cantidad:Q', title=None),
-            tooltip=['Métrica', 'Cantidad']
-        ).properties(height=300)
-        st.altair_chart(chart_tech, use_container_width=True)
+        if not tech_df.empty and tech_df['Cantidad'].sum() > 0:
+            chart_tech = alt.Chart(tech_df).mark_bar(color='#FF0000', cornerRadiusTopLeft=5, cornerRadiusTopRight=5).encode(
+                x=alt.X('Métrica:N', sort=None, title=None),
+                y=alt.Y('Cantidad:Q', title=None),
+                tooltip=['Métrica', 'Cantidad']
+            ).properties(height=300)
+            st.altair_chart(chart_tech, width='stretch')
+        else:
+            st.caption("Esperando datos tecnológicos...")
 
     # --- FILA 2: SECTORES Y CIUDADES ---
     st.divider()
@@ -87,25 +93,31 @@ def render_analytics_view(df_all):
 
     with c1:
         st.markdown("#### 🏗️ Top 10 Sectores Dominantes")
-        nicho_counts = df['nicho'].value_counts().head(10).reset_index()
-        nicho_counts.columns = ['Nicho', 'Cantidad']
-        chart_nicho = alt.Chart(nicho_counts).mark_bar(color='#6EB4C9', cornerRadiusTopRight=5, cornerRadiusBottomRight=5).encode(
-            x=alt.X('Cantidad:Q', title=None),
-            y=alt.Y('Nicho:N', sort='-x', title=None),
-            tooltip=['Nicho', 'Cantidad']
-        ).properties(height=350)
-        st.altair_chart(chart_nicho, use_container_width=True)
+        if not df['nicho'].dropna().empty:
+            nicho_counts = df['nicho'].value_counts().head(10).reset_index()
+            nicho_counts.columns = ['Nicho', 'Cantidad']
+            chart_nicho = alt.Chart(nicho_counts).mark_bar(color='#6EB4C9', cornerRadiusTopRight=5, cornerRadiusBottomRight=5).encode(
+                x=alt.X('Cantidad:Q', title=None),
+                y=alt.Y('Nicho:N', sort='-x', title=None),
+                tooltip=['Nicho', 'Cantidad']
+            ).properties(height=350)
+            st.altair_chart(chart_nicho, width='stretch')
+        else:
+            st.caption("No hay datos de sectores.")
 
     with c2:
         st.markdown("#### 📍 Concentración Geográfica")
-        city_counts = df['ciudad'].value_counts().head(10).reset_index()
-        city_counts.columns = ['Ciudad', 'Cantidad']
-        chart_city = alt.Chart(city_counts).mark_bar(color='#A06EC9', cornerRadiusTopLeft=5, cornerRadiusTopRight=5).encode(
-            x=alt.X('Ciudad:N', sort='-y', title=None),
-            y=alt.Y('Cantidad:Q', title=None),
-            tooltip=['Ciudad', 'Cantidad']
-        ).properties(height=350)
-        st.altair_chart(chart_city, use_container_width=True)
+        if not df['ciudad'].dropna().empty:
+            city_counts = df['ciudad'].value_counts().head(10).reset_index()
+            city_counts.columns = ['Ciudad', 'Cantidad']
+            chart_city = alt.Chart(city_counts).mark_bar(color='#A06EC9', cornerRadiusTopLeft=5, cornerRadiusTopRight=5).encode(
+                x=alt.X('Ciudad:N', sort='-y', title=None),
+                y=alt.Y('Cantidad:Q', title=None),
+                tooltip=['Ciudad', 'Cantidad']
+            ).properties(height=350)
+            st.altair_chart(chart_city, width='stretch')
+        else:
+            st.caption("No hay datos geográficos.")
 
     # --- FILA 3: MATRIZ DE REPUTACIÓN ---
     st.divider()
@@ -115,12 +127,15 @@ def render_analytics_view(df_all):
     # Filtramos ceros para una mejor visualización logarítmica/dispersa
     df_gem = df[df['reseñas_num'] > 0].copy()
     
-    chart_gems = alt.Chart(df_gem).mark_circle(size=100, opacity=0.6).encode(
-        x=alt.X('reseñas_num:Q', title="Número de Reseñas", scale=alt.Scale(type='symlog')),
-        y=alt.Y('rating_num:Q', title="Rating (Estrellas)", scale=alt.Scale(domain=[1, 5])),
-        color=alt.Color('tiene_web:N', title="¿Tiene Web?", scale=alt.Scale(range=['#FF0000', '#4ADE80'])),
-        size=alt.Size('rating_num:Q', legend=None),
-        tooltip=['nombre', 'nicho', 'rating', 'reseñas', 'ciudad']
-    ).properties(height=400).interactive()
-    
-    st.altair_chart(chart_gems, use_container_width=True)
+    if not df_gem.empty:
+        chart_gems = alt.Chart(df_gem).mark_circle(size=100, opacity=0.6).encode(
+            x=alt.X('reseñas_num:Q', title="Número de Reseñas", scale=alt.Scale(type='symlog')),
+            y=alt.Y('rating_num:Q', title="Rating (Estrellas)", scale=alt.Scale(domain=[1, 5])),
+            color=alt.Color('tiene_web:N', title="¿Tiene Web?", scale=alt.Scale(range=['#FF0000', '#4ADE80'])),
+            size=alt.Size('rating_num:Q', legend=None),
+            tooltip=['nombre', 'nicho', 'rating', 'reseñas', 'ciudad']
+        ).properties(height=400).interactive()
+        
+        st.altair_chart(chart_gems, width='stretch')
+    else:
+        st.info("No hay suficientes datos de reputación (reseñas) para generar esta matriz.")

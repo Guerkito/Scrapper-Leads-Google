@@ -8,7 +8,7 @@
         
         evo_url = evo_url_input.strip().rstrip("/")
         
-        if st.button("📱 Panel de Conexión / QR", use_container_width=True):
+        if st.button("📱 Panel de Conexión / QR", width='stretch'):
             if not evo_url or not evo_url.startswith("http"):
                 st.warning("⚠️ Pega la URL de ngrok primero.")
             else:
@@ -17,7 +17,7 @@
         if evo_url:
             st.markdown(f"[🔗 Abrir Manager Oficial de Evolution]({evo_url}/manager)", help="Si el QR no carga aquí, usa este panel oficial para vincular tu teléfono.")
 
-        if st.button("🔴 Eliminar Bot / Limpiar", use_container_width=True):
+        if st.button("🔴 Eliminar Bot / Limpiar", width='stretch'):
             try:
                 headers = {"apikey": evo_key, "ngrok-skip-browser-warning": "true"}
                 requests.delete(f"{evo_url}/instance/logout/{evo_instance}", headers=headers)

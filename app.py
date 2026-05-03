@@ -58,7 +58,7 @@ with st.sidebar:
     render_whatsapp_status_sidebar()
 
     st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-    if st.button("⚙️ Administración", use_container_width=True, type="secondary"):
+    if st.button("⚙️ Administración", width='stretch', type="secondary"):
         st.session_state.view = "⚙️ Admin"
         st.rerun()
 
