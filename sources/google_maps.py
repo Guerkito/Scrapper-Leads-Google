@@ -5,7 +5,7 @@ from typing import List
 from playwright.async_api import async_playwright
 from sources.base_source import BaseSource, Lead
 from scraper import (
-    BROWSER_ARGS, _RATING_SELECTORS, _REVIEW_SELECTORS, 
+    BROWSER_ARGS, _RATING_SELECTORS, _REVIEW_SELECTORS,
     _WEB_SELECTORS, _TYPE_SELECTORS, _PANEL_LOADED_SELECTORS,
     _wait_for_panel, _is_captcha, _scroll_and_wait, _is_end_of_results
 )
@@ -22,13 +22,13 @@ class GoogleMapsSource(BaseSource):
         else:
             search_query = f"{query} en {ciudad}"
             url = f"https://www.google.com/maps/search/{urllib.parse.quote(search_query)}/?hl=es"
-        
+
         # Extraer parámetros de control
         browser_context = kwargs.pop("context", None)
         max_results = kwargs.pop("limit", 20)
         l_callback = kwargs.pop("lead_callback", None)
         stop_check = kwargs.pop("stop_check", lambda: False)
-        
+
         if browser_context:
             return await self._execute_scrape(browser_context, url, query, ciudad, limit=max_results, lead_callback=l_callback, stop_check=stop_check)
         else:
@@ -46,7 +46,7 @@ class GoogleMapsSource(BaseSource):
             # Ir a la URL
             await page.goto(url, wait_until="domcontentloaded", timeout=60000)
             if stop_check(): return []
-            
+
             try: await page.click('button:has-text("Aceptar")', timeout=3000)
             except Exception: pass
 
@@ -55,16 +55,16 @@ class GoogleMapsSource(BaseSource):
                 return []
 
             audited = 0
-            
+
             while len(leads) < limit:
                 if stop_check(): break
-                
+
                 # Selector más específico: solo el enlace principal que contiene el nombre
                 items = await page.query_selector_all("a.hfpxzc")
                 if not items:
                     # Fallback si Google cambió la clase, pero evitando capturar todos los 'a'
                     items = await page.query_selector_all("div[role='article'] > a")
-                
+
                 if audited >= len(items):
                     if await _is_end_of_results(page, stop_check=stop_check): break
                     new_count = await _scroll_and_wait(page, len(items), stop_check=stop_check)
@@ -76,21 +76,21 @@ class GoogleMapsSource(BaseSource):
 
                 try:
                     name = await item.get_attribute("aria-label")
-                    if not name: 
+                    if not name:
                         name = await item.inner_text()
-                    
+
                     if not name: continue
-                    
+
                     # Filtro de basura
                     garbage = ["visitar el sitio web", "cómo llegar", "direcciones", "llamar", "guardar"]
                     if any(g in name.lower() for g in garbage):
                         continue
-                    
+
                     await item.scroll_into_view_if_needed()
                     await item.click(timeout=5000, force=True)
                     if stop_check(): break
                     await _wait_for_panel(page, name, stop_check=stop_check)
-                    
+
                     # Extracción de datos con selectores robustos
                     current_url = page.url
                     lat, lng = None, None
@@ -112,7 +112,7 @@ class GoogleMapsSource(BaseSource):
 
                     phone = "N/A"
                     p_el = await page.query_selector('button[data-item-id^="phone:tel:"]')
-                    if p_el: 
+                    if p_el:
                         phone = await p_el.inner_text()
                     else:
                         # Fallback de teléfono
@@ -127,22 +127,40 @@ class GoogleMapsSource(BaseSource):
                         r_el = await page.query_selector(_rs)
                         if r_el:
                             r_raw = await r_el.get_attribute("aria-label") or ""
+                            # Intentar extraer formato "4.5" o "4,5"
                             m_r = re.search(r"(\d[,\.]\d)", r_raw)
-                            if m_r: rating = float(m_r.group(1).replace(',', '.'))
-                            break
-                    
+                            if m_r:
+                                rating = float(m_r.group(1).replace(',', '.'))
+                                break
+                            # Fallback si solo es el número
+                            m_r2 = re.search(r"(\d)", r_raw)
+                            if m_r2:
+                                rating = float(m_r2.group(1))
+                                break
+
                     reviews = 0
                     for _rvs in _REVIEW_SELECTORS:
                         rv_el = await page.query_selector(_rvs)
                         if rv_el:
                             rv_raw = await rv_el.get_attribute("aria-label") or ""
-                            m_rv = re.search(r"(\d+)", rv_raw.replace('.', '').replace(',', ''))
-                            if m_rv: reviews = int(m_rv.group(1))
-                            break
+                            # Limpiar puntos y comas de miles
+                            clean_rv = rv_raw.replace('.', '').replace(',', '')
+                            m_rv = re.search(r"(\d+)", clean_rv)
+                            if m_rv:
+                                reviews = int(m_rv.group(1))
+                                break
+
+                    # Limpieza final de ciudad si viene como coord:
+                    final_city = ciudad
+                    if ciudad.startswith("coord:"):
+                        # Intentamos extraer un nombre de ciudad razonable o dejamos el original
+                        # pero el orquestador ya debería encargarse de esto.
+                        # Aquí lo dejamos por seguridad.
+                        pass
 
                     lead_obj = Lead(
                         nombre=name.strip(),
-                        ciudad=ciudad,
+                        ciudad=final_city,
                         nicho=query,
                         fuente="google_maps",
                         telefono=phone,
@@ -153,10 +171,10 @@ class GoogleMapsSource(BaseSource):
                         maps_url=current_url,
                         lat=lat,
                         lng=lng,
-                        raw_data={"maps_url": current_url, "reviews_raw": reviews}
+                        raw_data={"maps_url": current_url, "reviews_raw": reviews, "rating_extracted": rating}
                     )
                     leads.append(lead_obj)
-                    
+
                     # NOTIFICAR CAPTURA EN TIEMPO REAL
                     if lead_callback: lead_callback(lead_obj)
                     print(f"✅ GoogleMaps: Capturado {name[:20]}...")

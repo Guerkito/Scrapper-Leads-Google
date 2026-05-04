@@ -5,12 +5,12 @@ services:
     network_mode: host
     environment:
       - AUTHENTICATION_TYPE=apikey
-      - AUTHENTICATION_API_KEY=${EVO_API_KEY:-OnyxSecret2026}
+      - AUTHENTICATION_API_KEY=${EVO_API_KEY:?Set EVO_API_KEY in .env}
       - LOG_LEVEL=ERROR
       # Base de Datos Directa
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://postgres:pass123@127.0.0.1:5432/evolution?sslmode=disable
+      - DATABASE_CONNECTION_URI=postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@127.0.0.1:5432/evolution?sslmode=disable
       # Redis Directo
       - REDIS_ENABLED=true
       - REDIS_URI=redis://127.0.0.1:6379
@@ -28,7 +28,7 @@ services:
     network_mode: host
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=pass123
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       - POSTGRES_DB=evolution
     volumes:
       - evolution_db_v4:/var/lib/postgresql/data

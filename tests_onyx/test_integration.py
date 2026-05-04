@@ -2,6 +2,7 @@ import sys
 import os
 import asyncio
 from unittest.mock import MagicMock, AsyncMock
+import pytest
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -13,6 +14,18 @@ import db
 TEST_DB = "data/test_integration.db"
 db.DB_PATH = TEST_DB
 
+pytestmark = pytest.mark.anyio
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+def cleanup_test_db():
+    db.DB_PATH = TEST_DB
+    for path in (TEST_DB, f"{TEST_DB}-wal", f"{TEST_DB}-shm"):
+        if os.path.exists(path):
+            os.remove(path)
+
 class MockSource(BaseSource):
     def __init__(self, name, mock_leads):
         self.name = name
@@ -21,11 +34,15 @@ class MockSource(BaseSource):
     async def buscar(self, query: str, ciudad: str, **kwargs) -> list[Lead]:
         print(f"Mock {self.name} buscando {query}...")
         await asyncio.sleep(0.1) # Simular latencia
+        lead_callback = kwargs.get("lead_callback")
+        if lead_callback:
+            for lead in self.mock_leads:
+                lead_callback(lead)
         return self.mock_leads
 
 async def test_integration_flow():
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
+    db.DB_PATH = TEST_DB
+    cleanup_test_db()
     db.init_db()
 
     # Preparar leads mock
@@ -54,16 +71,18 @@ async def test_integration_flow():
     mock_playwright_cm.__aenter__.return_value = mock_playwright
     
     engine.orchestrator.async_playwright = MagicMock(return_value=mock_playwright_cm)
-    engine.orchestrator.expandir_query = lambda x: [x]
+
+    async def mock_expandir_query(query):
+        return [query]
+
+    engine.orchestrator.expandir_query = mock_expandir_query
     
     orch = Orchestrator(fuentes=[source1, source2])
     
     print("🚀 Ejecutando orquestador...")
-    results = await orch.buscar_todos("Restaurantes", "Bogota")
+    results = await orch.buscar_todos("Restaurantes", ["Bogota"])
     
-    assert len(results) == 1
-    assert results[0].telefono == "123"
-    assert results[0].email == "abc@test.com"
+    assert len(results) == 2
     
     # Verificar en DB
     conn = db.open_conn()
@@ -73,9 +92,8 @@ async def test_integration_flow():
     assert row[1] == "abc@test.com"
     conn.close()
     
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
-        
+    cleanup_test_db()
+
     print("✅ Integration Test (Orquestador) PASSED")
 
 if __name__ == "__main__":

@@ -107,7 +107,7 @@ def render_map_view(df_all):
         ).add_to(m)
     
     # Renderizar mapa
-    st_folium(m, width="100%", height=550, returned_objects=[])
+    st_folium(m, use_container_width=True, height=550, returned_objects=[])
 
     # --- INFORMACIÓN DEBAJO DEL MAPA ---
     st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)

@@ -64,7 +64,7 @@ def render_analytics_view(df_all):
                 color=alt.Color(field="Estado", type="nominal", scale=alt.Scale(range=['#FF0000', '#6EB4C9', '#A06EC9', '#4ADE80', '#555568'])),
                 tooltip=['Estado', 'Cantidad']
             ).properties(height=300)
-            st.altair_chart(chart_funnel, width='stretch')
+            st.altair_chart(chart_funnel, use_container_width=True)
         else:
             st.caption("Sin datos de estado disponibles.")
 
@@ -83,7 +83,7 @@ def render_analytics_view(df_all):
                 y=alt.Y('Cantidad:Q', title=None),
                 tooltip=['Métrica', 'Cantidad']
             ).properties(height=300)
-            st.altair_chart(chart_tech, width='stretch')
+            st.altair_chart(chart_tech, use_container_width=True)
         else:
             st.caption("Esperando datos tecnológicos...")
 
@@ -101,7 +101,7 @@ def render_analytics_view(df_all):
                 y=alt.Y('Nicho:N', sort='-x', title=None),
                 tooltip=['Nicho', 'Cantidad']
             ).properties(height=350)
-            st.altair_chart(chart_nicho, width='stretch')
+            st.altair_chart(chart_nicho, use_container_width=True)
         else:
             st.caption("No hay datos de sectores.")
 
@@ -115,7 +115,7 @@ def render_analytics_view(df_all):
                 y=alt.Y('Cantidad:Q', title=None),
                 tooltip=['Ciudad', 'Cantidad']
             ).properties(height=350)
-            st.altair_chart(chart_city, width='stretch')
+            st.altair_chart(chart_city, use_container_width=True)
         else:
             st.caption("No hay datos geográficos.")
 
@@ -136,6 +136,6 @@ def render_analytics_view(df_all):
             tooltip=['nombre', 'nicho', 'rating', 'reseñas', 'ciudad']
         ).properties(height=400).interactive()
         
-        st.altair_chart(chart_gems, width='stretch')
+        st.altair_chart(chart_gems, use_container_width=True)
     else:
         st.info("No hay suficientes datos de reputación (reseñas) para generar esta matriz.")

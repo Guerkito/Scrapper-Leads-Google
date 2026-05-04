@@ -3,6 +3,7 @@ import os
 import asyncio
 import random
 import time
+import pytest
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -11,6 +12,18 @@ from sources.base_source import Lead
 
 TEST_DB = "data/test_stress.db"
 db.DB_PATH = TEST_DB
+
+pytestmark = pytest.mark.anyio
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+def cleanup_test_db():
+    db.DB_PATH = TEST_DB
+    for path in (TEST_DB, f"{TEST_DB}-wal", f"{TEST_DB}-shm"):
+        if os.path.exists(path):
+            os.remove(path)
 
 async def concurrent_save(id_task, conn):
     lead = Lead(
@@ -26,8 +39,8 @@ async def concurrent_save(id_task, conn):
     return success
 
 async def test_concurrency():
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
+    db.DB_PATH = TEST_DB
+    cleanup_test_db()
     db.init_db()
     
     conn = db.open_conn()
@@ -52,8 +65,7 @@ async def test_concurrency():
     print(f"📊 Registros finales en DB: {count}")
     assert count == 5
     
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
+    cleanup_test_db()
     print("✅ Stress Test (Concurrencia) PASSED")
 
 if __name__ == "__main__":

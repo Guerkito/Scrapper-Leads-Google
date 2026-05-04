@@ -18,7 +18,7 @@ init_db()
 
 PORT = int(os.getenv("WEBHOOK_PORT", 5001))
 EVO_URL = os.getenv("EVO_URL", "http://127.0.0.1:8080")
-EVO_API_KEY = os.getenv("EVO_API_KEY", "OnyxSecret2026")
+EVO_API_KEY = os.getenv("EVO_API_KEY", "")
 EVO_INSTANCE = os.getenv("EVO_INSTANCE", "onyxbot")
 OLLAMA_CHAT_URL = os.getenv("OLLAMA_CHAT_URL", "http://127.0.0.1:11434/api/chat")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
@@ -132,6 +132,11 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
                             "number": remote_jid.split("@")[0],
                             "text": response_text
                         }
+                        if not EVO_API_KEY:
+                            logger.error("EVO_API_KEY no está configurada; no se enviará respuesta por Evolution API.")
+                            self.send_response(500)
+                            self.end_headers()
+                            return
                         headers = {"apikey": EVO_API_KEY, "Content-Type": "application/json"}
                         requests.post(f"{EVO_URL}/message/sendText/{EVO_INSTANCE}", 
                                       json=send_payload, headers=headers)

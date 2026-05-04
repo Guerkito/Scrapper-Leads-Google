@@ -291,15 +291,23 @@ async def scrape_zone(context, query, max_results, city, country, nicho_val,
                             r_el = await page.query_selector(_rs)
                             if r_el:
                                 r_raw = await r_el.get_attribute("aria-label") or ""
+                                # Intentar extraer formato "4.5" o "4,5"
                                 m_r   = re.search(r"(\d[,\.]\d)", r_raw)
                                 if m_r:
                                     r_num = f"{m_r.group(1).replace(',', '.')} / 5"
-                                break
+                                    break
+                                # Fallback si solo es el número
+                                m_r2 = re.search(r"(\d)", r_raw)
+                                if m_r2:
+                                    r_num = f"{m_r2.group(1)} / 5"
+                                    break
                         for _rvs in _REVIEW_SELECTORS:
                             rev_el = await page.query_selector(_rvs)
                             if rev_el:
                                 rev_raw = await rev_el.get_attribute("aria-label") or ""
-                                rev_num = "".join(filter(str.isdigit, rev_raw)) or "0"
+                                # Limpiar puntos y comas de miles
+                                clean_rv = rev_raw.replace('.', '').replace(',', '')
+                                rev_num = "".join(filter(str.isdigit, clean_rv)) or "0"
                                 break
                     except Exception:
                         # Error silencioso en extracción de campos opcionales del panel lateral

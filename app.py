@@ -54,11 +54,11 @@ with st.sidebar:
     st.divider()
 
     st.markdown("<p style='font-size:0.7rem; font-weight:600; letter-spacing:0.1em; color:#6A6A7A; text-transform:uppercase; margin-bottom:10px;'>Estado del Sistema</p>", unsafe_allow_html=True)
-    
+
     render_whatsapp_status_sidebar()
 
     st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-    if st.button("⚙️ Administración", width='stretch', type="secondary"):
+    if st.button("⚙️ Administración", use_container_width=True, type="secondary"):
         st.session_state.view = "⚙️ Admin"
         st.rerun()
 
@@ -90,7 +90,7 @@ c1, c2, c3, c4 = st.columns(4)
 if not df_all.empty:
     oro_count = len(df_all[df_all['calificacion'] == 'oro'])
     web_pct = (df_all['tiene_web'].sum() / len(df_all)) * 100 if len(df_all) > 0 else 0
-    
+
     def _parse_rating(x):
         try:
             return float(str(x).split('/')[0].strip()) if x and '/' in str(x) else 0
@@ -122,8 +122,8 @@ btns = [
 for i, (label, view_id) in enumerate(btns):
     is_active = st.session_state.view == view_id
     if nav_cols[i].button(
-        label, 
-        width="stretch", 
+        label,
+        use_container_width=True,
         key=f"nav_{view_id}",
         type="primary" if is_active else "secondary",
     ):

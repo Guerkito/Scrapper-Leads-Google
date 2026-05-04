@@ -261,6 +261,33 @@ def save_lead(lead, conn):
 
 
 
+def update_lead_field(lead_id, campo, valor):
+    """Actualiza un campo específico de un lead por su ID."""
+    allowed_fields = {
+        "estado",
+        "calificacion",
+        "notas",
+        "ultima_interaccion",
+        "estado_contacto",
+        "bot_pausado",
+        "whatsapp_id",
+        "fecha_ultimo_contacto",
+    }
+    if campo not in allowed_fields:
+        print(f"❌ Campo no permitido para actualizar: {campo}")
+        return False
+
+    try:
+        conn = open_conn()
+        conn.execute(f"UPDATE leads SET {campo} = ? WHERE id = ?", (valor, lead_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error actualizando lead {lead_id}: {e}")
+        return False
+
+
 def load_known_identifiers(ciudad: str, conn) -> tuple[set, set]:
     """Carga identificadores conocidos (nombres y Place IDs)."""
     nombres = {r[0].lower() for r in conn.execute("SELECT nombre FROM leads WHERE ciudad = ?", (ciudad,)).fetchall() if r[0]}
