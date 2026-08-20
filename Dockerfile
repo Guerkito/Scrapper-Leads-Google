@@ -14,7 +14,7 @@ RUN useradd -m -u 1000 user
 WORKDIR /home/user/app
 
 # IMPORTANTE: Cambiar el dueño de la carpeta de la app al usuario 1000 antes de cambiar de usuario
-RUN chown user:user /home/user/app
+RUN mkdir -p /data && chown user:user /home/user/app /data
 
 USER user
 ENV HOME=/home/user \
@@ -23,9 +23,9 @@ ENV HOME=/home/user \
     PLAYWRIGHT_BROWSERS_PATH=/home/user/app/ms-playwright
 
 # Instalar dependencias de Python
-COPY --chown=user:user deps.txt .
+COPY --chown=user:user requirements.txt .
 RUN pip install --no-cache-dir -U pip && \
-    pip install --no-cache-dir -r deps.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Ahora el usuario ya tiene permiso para crear carpetas aquí
 RUN mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
@@ -37,8 +37,11 @@ COPY --chown=user:user . .
 # Configuración de Streamlit
 ENV STREAMLIT_SERVER_PORT=7860 \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
-    STREAMLIT_SERVER_ENABLE_CORS=false \
-    STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
+    STREAMLIT_SERVER_ENABLE_CORS=true \
+    STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=true \
+    DB_PATH=/data/leads.db
+
+VOLUME ["/data"]
 
 EXPOSE 7860
 

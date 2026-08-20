@@ -1,20 +1,20 @@
 import sys
 import os
-import sqlite3
+import tempfile
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import db
 
 # Mock DB
-TEST_DB = "data/test_bot.db"
+TEST_DB = os.path.join(tempfile.gettempdir(), "onyx_test_bot.db")
 db.DB_PATH = TEST_DB
 import webhook
-webhook.DB_PATH = TEST_DB
 
 def test_bot_context_retrieval():
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
+    for path in (TEST_DB, f"{TEST_DB}-wal", f"{TEST_DB}-shm"):
+        if os.path.exists(path):
+            os.remove(path)
     db.init_db()
     
     conn = db.open_conn()
@@ -39,8 +39,9 @@ def test_bot_context_retrieval():
     assert context2 is not None
     assert context2['nombre'] == "Cliente Bot"
 
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
+    for path in (TEST_DB, f"{TEST_DB}-wal", f"{TEST_DB}-shm"):
+        if os.path.exists(path):
+            os.remove(path)
     print("✅ Validation (Bot Context) PASSED")
 
 if __name__ == "__main__":

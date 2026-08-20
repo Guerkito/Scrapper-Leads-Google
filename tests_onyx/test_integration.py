@@ -1,6 +1,7 @@
 import sys
 import os
 import asyncio
+import tempfile
 from unittest.mock import MagicMock, AsyncMock
 import pytest
 
@@ -11,7 +12,7 @@ from sources.base_source import BaseSource, Lead
 import db
 
 # Mock DB
-TEST_DB = "data/test_integration.db"
+TEST_DB = os.path.join(tempfile.gettempdir(), "onyx_test_integration.db")
 db.DB_PATH = TEST_DB
 
 pytestmark = pytest.mark.anyio
@@ -39,6 +40,25 @@ class MockSource(BaseSource):
             for lead in self.mock_leads:
                 lead_callback(lead)
         return self.mock_leads
+
+
+class AdaptivePhoneSource(BaseSource):
+    def __init__(self, phones):
+        self.phones = phones
+        self.calls = []
+
+    async def buscar(self, query: str, ciudad: str, **kwargs) -> list[Lead]:
+        self.calls.append(query)
+        lead = Lead(
+            nombre=f"Negocio {query}",
+            ciudad=ciudad,
+            nicho=query,
+            fuente="adaptive",
+            telefono=self.phones[query],
+        )
+        callback = kwargs.get("lead_callback")
+        accepted = callback(lead) if callback else True
+        return [lead] if accepted is not False else []
 
 async def test_integration_flow():
     db.DB_PATH = TEST_DB
@@ -95,6 +115,97 @@ async def test_integration_flow():
     cleanup_test_db()
 
     print("✅ Integration Test (Orquestador) PASSED")
+
+async def test_hunter_mode_only_persists_leads_without_website():
+    db.DB_PATH = TEST_DB
+    cleanup_test_db()
+    db.init_db()
+
+    lead_without_web = Lead(
+        nombre="Negocio Sin Web",
+        ciudad="Bogota",
+        nicho="Restaurantes",
+        fuente="mock",
+        telefono="123",
+        sitio_web=None,
+        tiene_web=False
+    )
+    lead_with_web = Lead(
+        nombre="Negocio Con Web",
+        ciudad="Bogota",
+        nicho="Restaurantes",
+        fuente="mock",
+        telefono="456",
+        sitio_web="https://negocioconweb.com",
+        tiene_web=True
+    )
+
+    import engine.orchestrator
+
+    mock_browser = AsyncMock()
+    mock_context = AsyncMock()
+    mock_browser.new_context.return_value = mock_context
+
+    mock_playwright = AsyncMock()
+    mock_playwright.chromium.launch.return_value = mock_browser
+
+    mock_playwright_cm = AsyncMock()
+    mock_playwright_cm.__aenter__.return_value = mock_playwright
+
+    engine.orchestrator.async_playwright = MagicMock(return_value=mock_playwright_cm)
+
+    async def mock_expandir_query(query):
+        return [query]
+
+    engine.orchestrator.expandir_query = mock_expandir_query
+
+    orch = Orchestrator(fuentes=[MockSource("SourceHunter", [lead_without_web, lead_with_web])])
+    results = await orch.buscar_todos("Restaurantes", ["Bogota"], hunter_mode=True)
+
+    assert [lead.nombre for lead in results] == ["Negocio Sin Web"]
+
+    conn = db.open_conn()
+    rows = conn.execute("SELECT nombre, sitio_web, tiene_web FROM leads ORDER BY nombre").fetchall()
+    conn.close()
+
+    assert rows == [("Negocio Sin Web", None, 0)]
+
+    cleanup_test_db()
+
+
+async def test_cold_call_mode_expands_only_until_unique_valid_phone_target(monkeypatch):
+    db.DB_PATH = TEST_DB
+    cleanup_test_db()
+    db.init_db()
+    monkeypatch.setattr("engine.orchestrator.random.uniform", lambda *_: 0)
+
+    source = AdaptivePhoneSource({
+        "q1": "sin teléfono",
+        "q2": "300 123 4567",
+        "q3": "+57 301 234 5678",
+        "q4": "+57 302 345 6789",
+    })
+    callable_phones = set()
+    orchestrator = Orchestrator([source])
+    results = await orchestrator.buscar_fuente(
+        source,
+        ["q1", "q2", "q3", "q4"],
+        "Bogotá, Cundinamarca, Colombia",
+        {"ciudad": "Bogotá", "departamento": "Cundinamarca", "pais": "Colombia"},
+        context=AsyncMock(),
+        limit=2,
+        cold_call_mode=True,
+        known_phone_ids=set(),
+        callable_phone_ids=callable_phones,
+    )
+
+    assert source.calls == ["q1", "q2", "q3"]
+    assert len(callable_phones) == 2
+    assert len(results) == 2
+    with db.open_conn() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0] == 2
+
+    cleanup_test_db()
 
 if __name__ == "__main__":
     asyncio.run(test_integration_flow())

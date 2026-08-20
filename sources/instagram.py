@@ -7,13 +7,13 @@ from loguru import logger
 from sources.base_source import BaseSource, Lead
 from engine.maps_helpers import dorking_goto, decode_google_url
 
-class LinkedInSource(BaseSource):
+class InstagramSource(BaseSource):
     """
-    Busca perfiles de empresas en LinkedIn utilizando motores de búsqueda 
-    (Google Dorking) para evitar bloqueos directos y muros de login.
+    Busca perfiles de empresas en Instagram utilizando Google Dorking.
+    Excelente para Moda, Gastronomía y Belleza.
     """
     async def buscar(self, query: str, ciudad: str, **kwargs) -> List[Lead]:
-        search_query = f'site:linkedin.com/company "{query}" "{ciudad}"'
+        search_query = f'site:instagram.com "{query}" "{ciudad}"'
         url = f"https://www.google.com/search?q={urllib.parse.quote(search_query)}&hl=es"
         
         external_context = kwargs.pop("context", None)
@@ -44,7 +44,6 @@ class LinkedInSource(BaseSource):
                 return []
             if stop_check(): return []
 
-            # Buscamos los contenedores de resultados de Google
             results = await page.query_selector_all("div.g")
             
             for res in results[:max_results]:
@@ -60,38 +59,52 @@ class LinkedInSource(BaseSource):
                         profile_url = decode_google_url(profile_url)
                         snippet = await snippet_el.inner_text() if snippet_el else ""
 
-                        name = full_title.split(" | ")[0].split(" - ")[0].strip()
-                        
-                        sector = "Empresarial"
-                        if "Industria" in snippet:
-                            m = re.search(r"Industria:\s*([^·\n|]+)", snippet)
-                            if m: sector = m.group(1).strip()
+                        # Ignorar links de posts, reels o tags, queremos solo perfiles
+                        if "/p/" in profile_url or "/reel/" in profile_url or "/explore/" in profile_url:
+                            continue
 
+                        # Limpieza del título (ej: "Nombre Empresa (@usuario) • Instagram...")
+                        name = full_title.split("(@")[0].strip()
+                        
+                        # Extraer seguidores del snippet (soporta miles: "1.2k", "2,5 mil", "12.345")
+                        followers = 0
+                        m_foll = re.search(r'([\d.,]+[kKmM]?)\s*Followers', snippet, re.IGNORECASE)
+                        if not m_foll:
+                            m_foll = re.search(r'([\d.,]+[kKmM]?)\s*Seguidores', snippet, re.IGNORECASE)
+                            
+                        if m_foll:
+                            f_str = m_foll.group(1).lower().replace(',', '.')
+                            if 'k' in f_str:
+                                followers = int(float(f_str.replace('k', '')) * 1000)
+                            elif 'm' in f_str:
+                                followers = int(float(f_str.replace('m', '')) * 1000000)
+                            else:
+                                followers = int(round(float(f_str)))
+                        
                         lead_obj = Lead(
                             nombre=name,
                             ciudad=ciudad,
                             nicho=query,
-                            fuente="linkedin",
+                            fuente="instagram",
                             perfil_url=profile_url,
-                            linkedin_empresa=profile_url,
-                            tiene_web=False,
-                            tipo="B2B",
-                            sector=sector,
+                            instagram=profile_url,
+                            tiene_web=False, # Consideramos que IG no es una web propia
+                            tipo="B2C", # La mayoría en IG son B2C, el orquestador lo reescribe si es B2B
                             calificacion="bueno",
-                            raw_data={"snippet": snippet, "full_title": full_title}
+                            reseñas=followers, # Usamos el campo de reseñas para guardar los seguidores
+                            notas=f"[Influencia en IG: {followers} seguidores]",
+                            raw_data={"snippet": snippet, "followers": followers}
                         )
                         leads.append(lead_obj)
                         if lead_callback: lead_callback(lead_obj)
                 except Exception as e:
-                    logger.warning(f"Error procesando resultado LI: {e}")
                     continue
         except Exception as e:
-            logger.warning(f"Error en búsqueda LinkedIn (Google): {e}")
+            logger.warning(f"Error en búsqueda Instagram (Google): {e}")
         finally:
             await page.close()
             
         return leads
 
     def calificar(self, lead: Lead) -> str:
-        # Empresas en LinkedIn con perfiles establecidos suelen ser B2B interesantes
-        return "oro" if lead.tipo == "B2B" else "bueno"
+        return "oro" if lead.reseñas and lead.reseñas > 5000 else "bueno"

@@ -2,6 +2,7 @@ import sys
 import os
 import sqlite3
 import json
+import tempfile
 import pytest
 
 # Añadir el directorio raíz al path para importar db y fuentes
@@ -11,18 +12,21 @@ from db import save_lead, init_db, open_conn
 import db
 from sources.base_source import Lead
 
-# Mock DB_PATH for testing
-TEST_DB = "data/test_leads.db"
-db.DB_PATH = TEST_DB
+# DB de pruebas aislada (fuera del directorio de producción data/)
+TEST_DB = os.path.join(tempfile.gettempdir(), "onyx_test_leads.db")
+
+def _cleanup():
+    for path in (TEST_DB, f"{TEST_DB}-wal", f"{TEST_DB}-shm"):
+        if os.path.exists(path):
+            os.remove(path)
 
 def setup_module():
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
+    _cleanup()
+    db.DB_PATH = TEST_DB
     init_db()
 
 def teardown_module():
-    if os.path.exists(TEST_DB):
-        os.remove(TEST_DB)
+    _cleanup()
 
 def test_upsert_enrichment():
     conn = open_conn()
@@ -39,7 +43,7 @@ def test_upsert_enrichment():
     
     # Guardar primer lead
     success1 = save_lead(lead1, conn)
-    assert success1 is True
+    assert success1 == 1
     
     # Verificar inserción
     cursor = conn.execute("SELECT telefono, email, nit, fuentes_encontrado FROM leads WHERE nombre='Empresa Test'")
@@ -61,7 +65,7 @@ def test_upsert_enrichment():
     
     # Guardar segundo lead (UPSERT)
     success2 = save_lead(lead2, conn)
-    assert success2 is True
+    assert success2 == 0
     
     # Verificar enriquecimiento
     cursor = conn.execute("SELECT telefono, email, nit, sitio_web, fuentes_encontrado FROM leads WHERE nombre='Empresa Test'")

@@ -45,7 +45,7 @@ call venv_windows\Scripts\activate
 if not exist "venv_windows\installed.txt" (
     echo [*] Instalando librerias (esto solo tarda un minuto)...
     python -m pip install --upgrade pip --quiet
-    pip install -r deps.txt --quiet
+    pip install -r requirements.txt --quiet
     echo [*] Instalando navegador interno...
     playwright install chromium
     echo done > "venv_windows\installed.txt"

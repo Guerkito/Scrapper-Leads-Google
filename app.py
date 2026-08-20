@@ -1,15 +1,7 @@
 import streamlit as st
-import os
-import sqlite3
-import pandas as pd
-import requests
 import datetime
-import time
-from dotenv import load_dotenv
 
-# Cargar variables de entorno
-load_dotenv()
-
+import config  # carga .env y centraliza configuración
 from db import init_db, DB_PATH
 from ui.styles import apply_styles
 from ui.search import render_search_view
@@ -17,18 +9,25 @@ from ui.crm import render_crm_view
 from ui.map import render_map_view
 from ui.analytics import render_analytics_view
 from ui.whatsapp import render_whatsapp_view
+from ui.email import render_email_view
 from ui.admin import render_admin_view
-from ui.helpers import kpi_card
-from services.leads import get_wa_link, get_score, load_all_leads
-from services.constants import STATUS_COLORS
+from ui.helpers import overview_strip
+from services.leads import load_all_leads
 from services.whatsapp_service import render_whatsapp_status_sidebar
 
 # ---------------------------------------------------------------------------
 # Init
 # ---------------------------------------------------------------------------
-init_db()
+@st.cache_resource(show_spinner=False)
+def _initialize_database(database_path):
+    """Inicializa esquema/migraciones una sola vez por proceso y base de datos."""
+    init_db()
+    return database_path
 
-if 'view'              not in st.session_state: st.session_state.view = "🌍 Búsqueda"
+
+_initialize_database(DB_PATH)
+
+if 'view'              not in st.session_state: st.session_state.view = "Búsqueda"
 if 'total_session'     not in st.session_state: st.session_state.total_session = 0
 if 'skipped_session'   not in st.session_state: st.session_state.skipped_session = 0
 if 'pais_sel'          not in st.session_state: st.session_state.pais_sel = "Colombia"
@@ -37,7 +36,7 @@ if 'last_summary'      not in st.session_state: st.session_state.last_summary = 
 # ---------------------------------------------------------------------------
 # Page Config
 # ---------------------------------------------------------------------------
-st.set_page_config(page_title="Lead Gen ONYX", layout="wide", page_icon="⬛")
+st.set_page_config(page_title="Lead Gen ONYX", layout="wide")
 apply_styles()
 
 # ---------------------------------------------------------------------------
@@ -49,104 +48,114 @@ with st.sidebar:
             LEAD GEN
             <span>ONYX</span>
         </div>
-        <div class='onyx-version'>Intelligence Platform &nbsp;·&nbsp; v3.0</div>
+        <div class='onyx-version'>Prospección comercial &nbsp;·&nbsp; v3.0</div>
     """, unsafe_allow_html=True)
     st.divider()
 
-    st.markdown("<p style='font-size:0.7rem; font-weight:600; letter-spacing:0.1em; color:#6A6A7A; text-transform:uppercase; margin-bottom:10px;'>Estado del Sistema</p>", unsafe_allow_html=True)
+    st.markdown("<p class='sidebar-label'>Conexiones</p>", unsafe_allow_html=True)
 
     render_whatsapp_status_sidebar()
 
     st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-    if st.button("⚙️ Administración", use_container_width=True, type="secondary"):
-        st.session_state.view = "⚙️ Admin"
-        st.rerun()
+    if st.button("Administración", width="stretch", type="secondary"):
+        st.session_state.view = "Admin"
 
     st.divider()
-    st.caption("Onyx Intelligence Platform © 2024")
+    st.caption(f"ONYX © {datetime.date.today().year}")
 
 # ---------------------------------------------------------------------------
 # Header & Metrics
 # ---------------------------------------------------------------------------
 st.markdown("""
     <div class='onyx-header'>
-        LEAD GEN &nbsp;<span class='onyx-header-red'>ONYX</span>
+        ONYX <span class='onyx-header-red'>LeadGen</span>
     </div>
-    <div class='onyx-subtitle'>Prospección inteligente &nbsp;·&nbsp; Google Maps Intelligence</div>
+    <div class='onyx-subtitle'>Encuentra, prioriza y contacta clientes potenciales</div>
 """, unsafe_allow_html=True)
 
 df_all = load_all_leads()
 
-# KPIs principales
-r1a, r1b, r1c = st.columns(3)
-r1a.markdown(kpi_card("Leads capturados", st.session_state.total_session, "#FF0000", "nuevos esta sesión"), unsafe_allow_html=True)
-r1b.markdown(kpi_card("Duplicados omitidos", st.session_state.skipped_session, "#555568", "ya existían en la DB"), unsafe_allow_html=True)
-r1c.markdown(kpi_card("Total en base de datos", len(df_all), "#FF0000"), unsafe_allow_html=True)
-
-# Tarjetas secundarias (Restauradas según petición del usuario)
-st.markdown("<div style='margin-bottom:12px'></div>", unsafe_allow_html=True)
-c1, c2, c3, c4 = st.columns(4)
-
 if not df_all.empty:
     oro_count = len(df_all[df_all['calificacion'] == 'oro'])
-    web_pct = (df_all['tiene_web'].sum() / len(df_all)) * 100 if len(df_all) > 0 else 0
-
-    def _parse_rating(x):
-        try:
-            return float(str(x).split('/')[0].strip()) if x and '/' in str(x) else 0
-        except: return 0
-    avg_rating = df_all['rating'].apply(_parse_rating).mean()
-    top_city = df_all['ciudad'].value_counts().idxmax() if 'ciudad' in df_all.columns and not df_all['ciudad'].dropna().empty else "N/A"
+    if 'telefono_e164' in df_all.columns:
+        callable_count = df_all['telefono_e164'].fillna("").astype(str).str.startswith("+").sum()
+    else:
+        callable_count = df_all['telefono'].fillna("").astype(str).str.len().ge(7).sum()
 else:
-    oro_count, web_pct, avg_rating, top_city = 0, 0, 0, "N/A"
-
-c1.markdown(kpi_card("Leads Oro 🏆", f"{oro_count}", "#F5C518"), unsafe_allow_html=True)
-c2.markdown(kpi_card("Adopción Web 🌐", f"{round(web_pct)}%", "#4ADE80"), unsafe_allow_html=True)
-c3.markdown(kpi_card("Rating Promedio ⭐", f"{round(avg_rating, 1)}", "#FF0000"), unsafe_allow_html=True)
-c4.markdown(kpi_card("Top Ciudad 📍", f"{top_city}", "#FFFFFF"), unsafe_allow_html=True)
-
-st.markdown("<div style='margin-bottom:12px'></div>", unsafe_allow_html=True)
+    oro_count, callable_count = 0, 0
 
 # ---------------------------------------------------------------------------
 # Navbar
 # ---------------------------------------------------------------------------
-nav_cols = st.columns([1,1,1,1,1])
 btns = [
-    ("🌍 Búsqueda", "🌍 Búsqueda"),
-    ("📝 CRM", "📝 CRM"),
-    ("🗺️ Mapa", "🗺️ Mapa"),
-    ("📊 Analytics", "📊 Analytics"),
-    ("🚀 WhatsApp", "🚀 WhatsApp")
+    ("Buscar clientes", "Búsqueda"),
+    ("CRM", "CRM"),
+    ("Mapa", "Mapa"),
+    ("Resultados", "Analytics"),
+    ("WhatsApp", "WhatsApp"),
+    ("Correo", "Email")
 ]
 
-for i, (label, view_id) in enumerate(btns):
-    is_active = st.session_state.view == view_id
-    if nav_cols[i].button(
-        label,
-        use_container_width=True,
-        key=f"nav_{view_id}",
-        type="primary" if is_active else "secondary",
-    ):
+with st.container(key="main_navigation"):
+    nav_cols = st.columns([1,1,1,1,1,1])
+
+    def _navigate(view_id):
         st.session_state.view = view_id
-        st.rerun()
+
+    for i, (label, view_id) in enumerate(btns):
+        is_active = st.session_state.view == view_id
+        nav_cols[i].button(
+            label,
+            width="stretch",
+            key=f"nav_{view_id}",
+            type="primary" if is_active else "secondary",
+            on_click=_navigate,
+            args=(view_id,),
+        )
+
+st.markdown(
+    overview_strip([
+        ("Base de leads", f"{len(df_all):,}", "total guardado"),
+        ("Listos para llamar", f"{int(callable_count):,}", "teléfono válido"),
+        ("Alta prioridad", f"{oro_count:,}", "calificación oro"),
+        ("Esta sesión", f"{st.session_state.total_session:,}", "leads nuevos"),
+    ]),
+    unsafe_allow_html=True,
+)
 
 # ---------------------------------------------------------------------------
 # Main Content area
 # ---------------------------------------------------------------------------
 view_mode = st.session_state.view
 
-if view_mode == "🌍 Búsqueda":
+if view_mode == "Búsqueda":
     render_search_view()
-elif view_mode == "📝 CRM":
+elif view_mode == "CRM":
     render_crm_view(df_all)
-elif view_mode == "🗺️ Mapa":
+elif view_mode == "Mapa":
     render_map_view(df_all)
-elif view_mode == "📊 Analytics":
+elif view_mode == "Analytics":
     render_analytics_view(df_all)
-elif view_mode == "🚀 WhatsApp":
+elif view_mode == "WhatsApp":
     render_whatsapp_view(df_all)
-elif view_mode == "⚙️ Admin":
+elif view_mode == "Email":
+    render_email_view(df_all)
+elif view_mode == "Admin":
     render_admin_view()
+
+# Consolidación del resumen de misión en cualquier pestaña: si una misión de
+# fondo terminó (aunque el usuario navegó a CRM/Mapa/otra vista), sumamos sus
+# resultados y mostramos el toast en el próximo rerun.
+_mission = st.session_state.get("MISSION")
+if _mission is not None:
+    _mstate = _mission.snapshot()
+    _was_running = st.session_state.get("_mission_was_running_prev", False)
+    if _was_running and not _mstate["running"]:
+        _summary = _mstate.get("last_summary") or {}
+        st.session_state.total_session += int(_summary.get("leads") or 0)
+        st.session_state.skipped_session += int(_summary.get("dupes") or 0)
+        st.session_state.last_summary = _summary
+    st.session_state._mission_was_running_prev = _mstate["running"]
 
 # Alerts / Summary
 if st.session_state.last_summary:

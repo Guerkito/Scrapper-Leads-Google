@@ -1,6 +1,6 @@
 NICHOS = {
     "lecheras": {
-        "queries_maps": ["ganadería lechera", "finca lechera", "acopio de leche", 
+        "queries_maps": ["ganadería lechera", "finca lechera", "acopio de leche",
                          "planta pasteurizadora", "cooperativa lechera"],
         "queries_rues_ciiu": ["0141", "0142"],
         "densidad_grid_km": 3.0,
@@ -8,7 +8,7 @@ NICHOS = {
         "sector": "agroindustria"
     },
     "colegios": {
-        "queries_maps": ["colegio privado", "institución educativa privada", 
+        "queries_maps": ["colegio privado", "institución educativa privada",
                          "colegio bilingüe", "liceo", "gimnasio escolar"],
         "queries_rues_ciiu": ["8510", "8520"],
         "densidad_grid_km": 0.5,
@@ -16,7 +16,7 @@ NICHOS = {
         "sector": "educacion"
     },
     "campestres": {
-        "queries_maps": ["club campestre", "finca para eventos", 
+        "queries_maps": ["club campestre", "finca para eventos",
                          "hacienda eventos", "salón campestre", "finca recreacional"],
         "queries_rues_ciiu": ["5520"],
         "densidad_grid_km": 1.5,
@@ -24,7 +24,7 @@ NICHOS = {
         "sector": "entretenimiento"
     },
     "embutidos": {
-        "queries_maps": ["planta embutidos", "fábrica embutidos", 
+        "queries_maps": ["planta embutidos", "fábrica embutidos",
                          "procesadora cárnica", "carnes frías productor"],
         "queries_rues_ciiu": ["1011", "1013"],
         "densidad_grid_km": 2.0,
@@ -32,7 +32,7 @@ NICHOS = {
         "sector": "alimentos"
     },
     "snacks": {
-        "queries_maps": ["fábrica snacks", "procesadora alimentos", 
+        "queries_maps": ["fábrica snacks", "procesadora alimentos",
                          "platanitos industrial", "frituras industriales"],
         "queries_rues_ciiu": ["1030", "1089"],
         "densidad_grid_km": 2.0,
@@ -102,6 +102,20 @@ NICHOS = {
         "densidad_grid_km": 0.5,
         "tipo": "B2C",
         "sector": "bienestar"
+    },
+    "clínicas de cirugía estética": {
+        "queries_maps": ["clínica de cirugía estética", "clínica de cirugía plástica", "cirujano plástico", "centro de cirugía estética", "medicina estética y cirugía plástica"],
+        "queries_rues_ciiu": ["8621"],
+        "densidad_grid_km": 0.5,
+        "tipo": "B2C",
+        "sector": "salud"
+    },
+    "canchas sintéticas": {
+        "queries_maps": ["cancha sintética", "cancha de fútbol sintética", "alquiler de canchas de fútbol", "cancha de fútbol 5", "complejo de canchas sintéticas"],
+        "queries_rues_ciiu": ["9311"],
+        "densidad_grid_km": 0.5,
+        "tipo": "B2C",
+        "sector": "entretenimiento"
     },
     "inmobiliarias": {
         "queries_maps": ["inmobiliaria", "bienes raíces", "finca raíz", "agencia inmobiliaria", "arrendamientos y ventas"],
@@ -181,9 +195,17 @@ NICHOS = {
         "sector": "servicios"
     },
     "ips_salud": {
-        "queries_maps": ["IPS", "centro médico", "clínica salud", "servicios médicos", "laboratorio clínico"],
+        "queries_maps": [
+            "IPS administrativo",
+            "centro médico oficina",
+            "clínica dirección general",
+            "gerencia de salud",
+            "IPS atención al cliente corporativo",
+            "sede administrativa IPS",
+            "laboratorio clínico gerencia"
+        ],
         "queries_rues_ciiu": ["8610", "8691"],
-        "densidad_grid_km": 0.5,
+        "densidad_grid_km": 0.8,
         "tipo": "B2B",
         "sector": "salud"
     },
@@ -214,5 +236,19 @@ NICHOS = {
         "densidad_grid_km": 0.5,
         "tipo": "B2C",
         "sector": "turismo"
+    },
+    "ips de salud (con gerencia)": {
+        "queries_maps": [
+            "gerencia IPS",
+            "oficinas administrativas IPS",
+            "sede administrativa clínica",
+            "dirección médica IPS",
+            "gerencia de salud",
+            "administración servicios de salud"
+        ],
+        "queries_rues_ciiu": ["8610", "8691"],
+        "densidad_grid_km": 1.0,
+        "tipo": "B2B",
+        "sector": "salud"
     }
 }

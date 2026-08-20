@@ -7,13 +7,12 @@ from loguru import logger
 from sources.base_source import BaseSource, Lead
 from engine.maps_helpers import dorking_goto, decode_google_url
 
-class LinkedInSource(BaseSource):
+class TripAdvisorSource(BaseSource):
     """
-    Busca perfiles de empresas en LinkedIn utilizando motores de búsqueda 
-    (Google Dorking) para evitar bloqueos directos y muros de login.
+    Busca restaurantes, hoteles y atracciones en TripAdvisor mediante Google Dorking.
     """
     async def buscar(self, query: str, ciudad: str, **kwargs) -> List[Lead]:
-        search_query = f'site:linkedin.com/company "{query}" "{ciudad}"'
+        search_query = f'site:tripadvisor.co "{query}" "{ciudad}"'
         url = f"https://www.google.com/search?q={urllib.parse.quote(search_query)}&hl=es"
         
         external_context = kwargs.pop("context", None)
@@ -44,7 +43,6 @@ class LinkedInSource(BaseSource):
                 return []
             if stop_check(): return []
 
-            # Buscamos los contenedores de resultados de Google
             results = await page.query_selector_all("div.g")
             
             for res in results[:max_results]:
@@ -60,38 +58,49 @@ class LinkedInSource(BaseSource):
                         profile_url = decode_google_url(profile_url)
                         snippet = await snippet_el.inner_text() if snippet_el else ""
 
-                        name = full_title.split(" | ")[0].split(" - ")[0].strip()
+                        # Filtrar foros, buscamos listados (Restaurant_Review, Hotel_Review)
+                        if "ShowTopic" in profile_url or "ShowForum" in profile_url:
+                            continue
+
+                        # Limpieza del título
+                        name = full_title.split(" - ")[0].split(" | ")[0].strip()
                         
-                        sector = "Empresarial"
-                        if "Industria" in snippet:
-                            m = re.search(r"Industria:\s*([^·\n|]+)", snippet)
-                            if m: sector = m.group(1).strip()
+                        # Extraer rating y reviews del snippet
+                        rating = None
+                        reviews = 0
+                        m_rating = re.search(r'Valoración:\s*(\d[,\.]\d)', snippet)
+                        if m_rating: rating = float(m_rating.group(1).replace(',', '.'))
+                        
+                        m_rev = re.search(r'([\d.,]+)\s*opiniones', snippet)
+                        if m_rev:
+                            # "1.234" / "1,234" usa separador de miles: quedarse con los dígitos.
+                            reviews = int("".join(ch for ch in m_rev.group(1) if ch.isdigit()))
 
                         lead_obj = Lead(
                             nombre=name,
                             ciudad=ciudad,
                             nicho=query,
-                            fuente="linkedin",
+                            fuente="tripadvisor",
                             perfil_url=profile_url,
-                            linkedin_empresa=profile_url,
                             tiene_web=False,
-                            tipo="B2B",
-                            sector=sector,
+                            tipo="B2C",
+                            sector="turismo_gastronomia",
                             calificacion="bueno",
+                            rating=rating,
+                            reseñas=reviews,
+                            notas="[Encontrado en TripAdvisor]",
                             raw_data={"snippet": snippet, "full_title": full_title}
                         )
                         leads.append(lead_obj)
                         if lead_callback: lead_callback(lead_obj)
                 except Exception as e:
-                    logger.warning(f"Error procesando resultado LI: {e}")
                     continue
         except Exception as e:
-            logger.warning(f"Error en búsqueda LinkedIn (Google): {e}")
+            logger.warning(f"Error en búsqueda TripAdvisor: {e}")
         finally:
             await page.close()
             
         return leads
 
     def calificar(self, lead: Lead) -> str:
-        # Empresas en LinkedIn con perfiles establecidos suelen ser B2B interesantes
-        return "oro" if lead.tipo == "B2B" else "bueno"
+        return "oro" if lead.rating and lead.rating >= 4.0 and lead.reseñas > 20 else "bueno"

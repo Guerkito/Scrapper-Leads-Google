@@ -7,9 +7,9 @@ sdk: docker
 app_port: 7860
 ---
 
-# 🚀 Lead Gen Pro - Elite Command Center (v11.0)
+# Lead Gen ONYX
 
-¡Bienvenido a la herramienta definitiva de inteligencia comercial para agencias y freelancers! **Lead Gen Pro** extrae, califica y organiza prospectos de cualquier nicho en cualquier parte del mundo.
+Herramienta privada de prospección para capturar, depurar, calificar y preparar leads para cold calling, WhatsApp y email. No incluye login: está pensada para ejecutarse en una máquina o red controlada.
 
 ---
 
@@ -34,18 +34,21 @@ Para evitar que tus leads capturados se borren al reiniciar el Space, **debes ac
 
 ---
 
-## 💎 Características Premium (v11.0 Elite)
+## Funciones principales
 
 ### 🌪️ Prospección Universal Multi-Nicho
-- **Filtro de Modo Dinámico:** Elige entre modo "Caza-Sitios" (sin web) o "SEO Audit" (con web).
-- **Extracción de URLs:** Captura automática de sitios web para auditorías de SEO y Ads.
-- **+150 Sub-nichos:** Desde salud y gastronomía hasta industria y servicios digitales.
-- **Modo Deep Scan:** Cobertura del 100% de los negocios en cualquier zona geográfica.
+- Búsqueda multi-fuente en Maps, directorios, redes y portales empresariales.
+- Catálogo local de más de 80 objetivos y soporte para términos libres mediante Ollama.
+- Filtro real de empresas sin sitio web; perfiles sociales/directorios no cuentan como web propia.
+- Deep Scan por cuadrícula cuando la ciudad tiene coordenadas inequívocas.
+- Deduplicación por Place ID o identidad `empresa + ciudad + país`.
+- Teléfonos internacionales E.164, scoring Oro/Bueno/Frío y enriquecimiento de emails.
 
 ### 🎯 Estrategia de Ventas (Matchmaker)
-- **WhatsApp Dinámico 📲:** Los mensajes se adaptan automáticamente si el prospecto tiene o no sitio web.
-- **Perfiles de Especialista:** Modos configurados para Diseñadores, SEOs, Fotógrafos, etc.
-- **Lead Scoring 🔥:** Calificación automática de prospectos (Oro, Bueno, Frío).
+- Campañas simuladas o reales con registro persistente, supresión “No contactar” y protección anti-duplicados.
+- Exportación CSV/Excel protegida contra fórmulas inyectadas.
+- Panel de calidad de datos, historial de campañas y búsquedas favoritas.
+- Webhook concurrente e idempotente para Evolution API con respuestas de Ollama sin herramientas.
 
 ---
 
@@ -80,3 +83,12 @@ Para tener un acceso directo profesional en Windows:
 
 ---
 *Desarrollado para cerrar contratos, no solo para buscar datos. 🚀🟢💎*
+
+## Verificación
+
+```bash
+pytest -q
+streamlit run app.py
+```
+
+Para Docker, la base se guarda en `/data/leads.db`. Monta un volumen persistente en `/data`.

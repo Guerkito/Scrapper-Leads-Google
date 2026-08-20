@@ -1,19 +1,22 @@
+import unicodedata
+
+
 NICHOS_DICT = {
-    "🌎 TODO EL MERCADO": ["TODOS LOS NEGOCIOS (Barrido Total)", "Empresas locales", "Servicios profesionales"],
-    "🏥 SALUD & MEDICINA": ["TODOS LOS SUBNICHOS (Sector Salud)", "Odontólogos", "Clínicas Médicas", "Psicólogos", "Fisioterapeutas", "Ópticas", "Dermatólogos", "Ginecólogos", "Pediatras", "Veterinarias"],
-    "🍽️ GASTRONOMÍA & OCIO": ["TODOS LOS SUBNICHOS (Sector Gastro)", "Restaurantes", "Cafeterías", "Pizzerías", "Hamburgueserías", "Panaderías", "Bares", "Sushi", "Comida Vegana"],
-    "🚗 SECTOR AUTOMOTRIZ": ["TODOS LOS SUBNICHOS (Sector Motor)", "Talleres Mecánicos", "Concesionarios", "Venta de Repuestos", "Lavado de Autos", "Centros de Diagnóstico", "Motos"],
-    "🏠 CONSTRUCCIÓN & HOGAR": ["TODOS LOS SUBNICHOS (Sector Hogar)", "Inmobiliarias", "Arquitectos", "Constructoras", "Ferreterías", "Reformas", "Cerrajeros", "Mueblerías"],
-    "💄 BELLEZA & BIENESTAR": ["TODOS LOS SUBNICHOS (Sector Belleza)", "Peluquerías", "Barberías", "Spas", "Centros de Uñas", "Gimnasios", "Yoga", "Tatuajes"],
-    "⚖️ PROFESIONALES & LEGAL": ["TODOS LOS SUBNICHOS (Sector Profesional)", "Abogados", "Contadores", "Notarías", "Asesores Fiscales", "Agencias de Seguros", "Agencias de Marketing"],
-    "🏗️ INDUSTRIAL & TÉCNICO": ["TODOS LOS SUBNICHOS (Sector Industrial)", "Fábricas", "Logística", "Mantenimiento", "Control de Plagas", "Textiles", "Metalúrgicas"],
-    "🎓 EDUCACIÓN": ["TODOS LOS SUBNICHOS (Sector Educación)", "Colegios", "Jardines Infantiles", "Academias de Idiomas", "Universidades", "Escuelas de Conducción"],
-    "💻 TECNOLOGÍA": ["TODOS LOS SUBNICHOS (Sector Tech)", "Reparación de Celulares", "Soporte Técnico", "Desarrollo Web", "Venta de Electrónica", "CCTV"],
-    "👗 MODA & RETAIL": ["TODOS LOS SUBNICHOS (Sector Moda)", "Tiendas de Ropa", "Zapaterías", "Joyerías", "Supermercados", "Tiendas Deportivas"],
-    "🐾 MASCOTAS": ["TODOS LOS SUBNICHOS (Sector Mascotas)", "Veterinarias", "Peluquería Canina", "Tiendas de Mascotas"],
-    "🎉 EVENTOS & TURISMO": ["TODOS LOS SUBNICHOS (Sector Turismo)", "Hoteles", "Salones de Eventos", "Fotógrafos", "Agencias de Viajes"],
-    "👔 SERVICIOS EMPRESARIALES": ["TODOS LOS SUBNICHOS (Sector B2B)", "Seguridad Privada", "Mensajería", "Mudanzas", "Imprentas"],
-    "💧 GESTIÓN DE AGUAS & AMBIENTAL": ["TODOS LOS SUBNICHOS (Sector Agua)", "Plantas de Tratamiento de Aguas", "Transporte de Aguas Residuales", "Succión de Pozos Sépticos", "Servicios de Vactor", "Ingeniería Ambiental"],
+    "TODO EL MERCADO": ["TODOS LOS NEGOCIOS (Barrido Total)", "Empresas locales", "Servicios profesionales"],
+    "SALUD & MEDICINA": ["TODOS LOS SUBNICHOS (Sector Salud)", "IPS de Salud (con Gerencia)", "Odontólogos", "Clínicas Médicas", "Clínicas de Cirugía Estética", "Psicólogos", "Fisioterapeutas", "Ópticas", "Dermatólogos", "Ginecólogos", "Pediatras", "Veterinarias"],
+    "GASTRONOMÍA & OCIO": ["TODOS LOS SUBNICHOS (Sector Gastro)", "Restaurantes", "Cafeterías", "Pizzerías", "Hamburgueserías", "Panaderías", "Bares", "Sushi", "Comida Vegana"],
+    "SECTOR AUTOMOTRIZ": ["TODOS LOS SUBNICHOS (Sector Motor)", "Talleres Mecánicos", "Concesionarios", "Venta de Repuestos", "Lavado de Autos", "Centros de Diagnóstico", "Motos"],
+    "CONSTRUCCIÓN & HOGAR": ["TODOS LOS SUBNICHOS (Sector Hogar)", "Inmobiliarias", "Arquitectos", "Constructoras", "Ferreterías", "Reformas", "Cerrajeros", "Mueblerías"],
+    "BELLEZA & BIENESTAR": ["TODOS LOS SUBNICHOS (Sector Belleza)", "Peluquerías", "Barberías", "Spas", "Centros de Uñas", "Gimnasios", "Canchas Sintéticas", "Yoga", "Tatuajes"],
+    "PROFESIONALES & LEGAL": ["TODOS LOS SUBNICHOS (Sector Profesional)", "Abogados", "Contadores", "Notarías", "Asesores Fiscales", "Agencias de Seguros", "Agencias de Marketing"],
+    "INDUSTRIAL & TÉCNICO": ["TODOS LOS SUBNICHOS (Sector Industrial)", "Fábricas", "Logística", "Mantenimiento", "Control de Plagas", "Textiles", "Metalúrgicas"],
+    "EDUCACIÓN": ["TODOS LOS SUBNICHOS (Sector Educación)", "Colegios", "Jardines Infantiles", "Academias de Idiomas", "Universidades", "Escuelas de Conducción"],
+    "TECNOLOGÍA": ["TODOS LOS SUBNICHOS (Sector Tech)", "Reparación de Celulares", "Soporte Técnico", "Desarrollo Web", "Venta de Electrónica", "CCTV"],
+    "MODA & RETAIL": ["TODOS LOS SUBNICHOS (Sector Moda)", "Tiendas de Ropa", "Zapaterías", "Joyerías", "Supermercados", "Tiendas Deportivas"],
+    "MASCOTAS": ["TODOS LOS SUBNICHOS (Sector Mascotas)", "Veterinarias", "Peluquería Canina", "Tiendas de Mascotas"],
+    "EVENTOS & TURISMO": ["TODOS LOS SUBNICHOS (Sector Turismo)", "Hoteles", "Salones de Eventos", "Fotógrafos", "Agencias de Viajes"],
+    "SERVICIOS EMPRESARIALES": ["TODOS LOS SUBNICHOS (Sector B2B)", "Seguridad Privada", "Mensajería", "Mudanzas", "Imprentas"],
+    "GESTIÓN DE AGUAS & AMBIENTAL": ["TODOS LOS SUBNICHOS (Sector Agua)", "Plantas de Tratamiento de Aguas", "Transporte de Aguas Residuales", "Succión de Pozos Sépticos", "Servicios de Vactor", "Ingeniería Ambiental"],
 }
 
 STATUS_COLORS = {
@@ -32,8 +35,10 @@ COUNTRY_CODES = {
 }
 
 NICHO_SYNONYMS = {
+    "IPS de Salud (con Gerencia)": ["Gerencia IPS", "Administración Salud", "Dirección Médica"],
     "Odontólogos":            ["Dentistas", "Clínica dental"],
     "Clínicas Médicas":       ["Centro médico", "Consultorio médico"],
+    "Clínicas de Cirugía Estética": ["Cirugía plástica", "Clínica de cirugía plástica", "Centro de cirugía estética"],
     "Psicólogos":             ["Psicología", "Terapeuta"],
     "Fisioterapeutas":        ["Fisioterapia", "Rehabilitación física"],
     "Ópticas":                ["Optometría", "Óptico"],
@@ -65,6 +70,7 @@ NICHO_SYNONYMS = {
     "Spas":                   ["Centro de bienestar", "Masajes"],
     "Centros de Uñas":        ["Manicure", "Uñas acrílicas"],
     "Gimnasios":              ["Gym", "Fitness", "Centro deportivo"],
+    "Canchas Sintéticas":     ["Cancha de fútbol sintética", "Alquiler de canchas", "Fútbol 5"],
     "Yoga":                   ["Yoga studio", "Pilates"],
     "Tatuajes":               ["Estudio de tatuajes", "Piercing"],
     "Abogados":               ["Bufete", "Estudio jurídico"],
@@ -100,3 +106,41 @@ NICHO_SYNONYMS = {
     "Empresas locales":       ["Negocios locales"],
     "Servicios profesionales":["Profesionales independientes"],
 }
+
+OFFER_SUGGESTIONS = {
+    "barberias": "Chatbot de WhatsApp para reservas, agenda automática y recordatorios de citas.",
+    "clinicas de cirugia estetica": "Sistema de citas, chatbot para valoración inicial y CRM de seguimiento de pacientes.",
+    "restaurantes": "Página web con menú, reservas o pedidos y chatbot de atención por WhatsApp.",
+    "cafeterias": "Página web con menú, pedidos anticipados y programa digital de fidelización.",
+    "inmobiliarias": "Página web de inmuebles, CRM comercial y chatbot para calificar interesados.",
+    "joyerias": "Catálogo o tienda virtual y chatbot para consultas, cotizaciones y seguimiento.",
+    "talleres mecanicos": "Sistema de citas, cotizaciones y recordatorios automáticos de mantenimiento.",
+    "constructoras": "Página web de proyectos y CRM a medida para captar y dar seguimiento a compradores.",
+    "lavado de autos": "Página web con reservas, planes recurrentes y recordatorios por WhatsApp.",
+    "gimnasios": "Sistema de membresías, reservas de clases y chatbot para captar nuevos inscritos.",
+    "canchas sinteticas": "Página web y chatbot para consultar horarios, reservar y confirmar pagos.",
+    "colegios": "Portal web de admisiones y chatbot para matrículas, preguntas y agendamiento de visitas.",
+}
+
+
+def _normalize_niche(value):
+    normalized = unicodedata.normalize("NFKD", str(value or "").strip().lower())
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
+def get_offer_suggestion(niche, has_website=None):
+    """Devuelve una oferta concreta según el nicho y la presencia web del negocio."""
+    normalized = _normalize_niche(niche)
+    suggestion = OFFER_SUGGESTIONS.get(normalized)
+    if suggestion is None:
+        for niche_key, niche_suggestion in OFFER_SUGGESTIONS.items():
+            if niche_key in normalized or normalized in niche_key:
+                suggestion = niche_suggestion
+                break
+
+    if suggestion is None:
+        suggestion = "Software a medida para automatizar reservas, atención al cliente o seguimiento comercial."
+
+    if has_website is not None and not bool(has_website) and "pagina web" not in _normalize_niche(suggestion):
+        return f"Página web profesional + {suggestion[0].lower()}{suggestion[1:]}"
+    return suggestion

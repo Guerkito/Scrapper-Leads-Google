@@ -1,37 +1,54 @@
 import streamlit as st
 import folium
+import html as html_lib
+from urllib.parse import urlparse
 from streamlit_folium import st_folium
 import pandas as pd
 from services.leads import get_wa_link
 from services.constants import STATUS_COLORS
 from ui.helpers import kpi_card
+from ui.icons import title_html
 
 def _status_color(estado):
     return STATUS_COLORS.get(estado, STATUS_COLORS["Nuevo"])
 
 def _build_popup(row, pais_sel, compact=False):
+    def safe(value):
+        if pd.isna(value):
+            return ""
+        return html_lib.escape(str(value), quote=True)
+
+    def safe_url(value):
+        candidate = str(value or "").strip()
+        try:
+            return candidate if urlparse(candidate).scheme in {"http", "https"} else ""
+        except ValueError:
+            return ""
+
     wa   = get_wa_link(row, pais_sel)
-    maps = row.get('maps_url', '#')
+    maps = safe_url(row.get('maps_url', ''))
     sc   = _status_color(row['estado'])
     pad  = "6px 10px" if compact else "10px 14px"
     badge = (f"<span style='background:{sc['color']};color:#0C0C0E;padding:2px 8px;"
-             f"border-radius:4px;font-size:11px;font-weight:700;'>{row['estado']}</span>")
+             f"border-radius:4px;font-size:11px;font-weight:700;'>{safe(row['estado'])}</span>")
     html = (f"<div style='min-width:200px;font-family:\"Space Grotesk\",sans-serif; background:#16161E; color:white; padding:10px; border-radius:8px;'>"
-            f"<b style='font-size:14px; color:#FFFFFF;'>{row['nombre']}</b><br>"
-            f"<span style='color:#888898;font-size:11px;'>⭐ {row['rating']} &nbsp;·&nbsp; {row['reseñas']} reseñas</span><br>"
+            f"<b style='font-size:14px; color:#FFFFFF;'>{safe(row['nombre'])}</b><br>"
+            f"<span style='color:#888898;font-size:11px;'>Rating {safe(row['rating'])} &nbsp;·&nbsp; {safe(row['reseñas'])} reseñas</span><br>"
             f"<div style='margin:8px 0'>{badge}</div>"
-            f"<p style='color:#6A6A7A; font-size:11px; margin:4px 0;'>{row.get('ciudad', '')} · {row.get('nicho', '')}</p>"
+            f"<p style='color:#6A6A7A; font-size:11px; margin:4px 0;'>{safe(row.get('ciudad', ''))} · {safe(row.get('nicho', ''))}</p>"
             f"<hr style='border-color:#1E1E28;margin:8px 0;'>")
     if wa:
         html += (f"<a href='{wa}' target='_blank' style='background:#25D366;color:white;padding:{pad};"
                  f"display:block;text-align:center;text-decoration:none;border-radius:6px;"
                  f"font-size:12px;font-weight:600;margin-bottom:8px;'>WhatsApp</a>")
-    html += (f"<a href='{maps}' target='_blank' style='color:{sc['color']};text-align:center;"
-             f"display:block;font-size:12px;font-weight:600;text-decoration:none;'>Ver en Google Maps</a></div>")
+    if maps:
+        html += (f"<a href='{safe(maps)}' target='_blank' rel='noopener noreferrer' style='color:{sc['color']};text-align:center;"
+                 f"display:block;font-size:12px;font-weight:600;text-decoration:none;'>Ver en Google Maps</a>")
+    html += "</div>"
     return html
 
 def render_map_view(df_all):
-    st.markdown("### 🗺️ Inteligencia Geográfica")
+    st.markdown(title_html("Inteligencia Geográfica", "map", 3), unsafe_allow_html=True)
     pais_sel = st.session_state.get('pais_sel', 'Colombia')
 
     # Filtrado inicial de coordenadas
@@ -113,7 +130,7 @@ def render_map_view(df_all):
     st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
     
     # Leyenda de Estados
-    st.markdown("#### 🔑 Leyenda de Prospercción")
+    st.markdown(title_html("Leyenda de Prospección", "pin", 4), unsafe_allow_html=True)
     l_cols = st.columns(len(STATUS_COLORS))
     for i, (name, style) in enumerate(STATUS_COLORS.items()):
         l_cols[i].markdown(
@@ -139,5 +156,5 @@ def render_map_view(df_all):
         oro_geos = len(df_f[df_f['calificacion'] == 'oro'])
         st.markdown(kpi_card("Objetivos Oro", f"{oro_geos}", "#F5C518", "Alta prioridad"), unsafe_allow_html=True)
     with i4:
-        pct_visible = round((len(df_f) / len(df_all) * 100)) if not df_all.empty else 0
-        st.markdown(kpi_card("Cobertura", f"{pct_visible}%", "#FFFFFF", "Del total de la DB"), unsafe_allow_html=True)
+        pct_visible = round((len(df_f) / len(df_map) * 100)) if not df_map.empty else 0
+        st.markdown(kpi_card("Cobertura", f"{pct_visible}%", "#FFFFFF", "Del total con coordenadas"), unsafe_allow_html=True)

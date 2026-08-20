@@ -1,0 +1,14 @@
+.env
+.git
+.github
+.pytest_cache
+__pycache__
+*.py[cod]
+*.log
+venv
+data
+graphify-out
+tests_onyx
+*.db
+*.db-wal
+*.db-shm

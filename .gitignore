@@ -7,7 +7,9 @@ venv/
 .pytest_cache/
 
 # Streamlit
-.streamlit/
+!.streamlit/
+.streamlit/*
+!.streamlit/config.toml
 
 # Environment
 .env

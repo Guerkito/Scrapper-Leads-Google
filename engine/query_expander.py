@@ -1,24 +1,15 @@
-import os
 import json
 import asyncio
 import httpx
-from nichos_dict import NICHOS
-
-OLLAMA_CHAT_URL = os.getenv("OLLAMA_CHAT_URL", "http://127.0.0.1:11434/api/chat")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
+from loguru import logger
+from config import OLLAMA_CHAT_URL, OLLAMA_MODEL
+from engine.niche_catalog import resolve_niche
 
 async def _expand_single_term(t: str, client: httpx.AsyncClient) -> list[str]:
     """Expande un solo término usando el diccionario o IA."""
-    t_clean = t.lower()
-    
-    # 1. Buscar en el diccionario local
-    if t_clean in NICHOS:
-        return NICHOS[t_clean]["queries_maps"]
-    
-    # Búsqueda por coincidencia parcial
-    for nicho, data in NICHOS.items():
-        if t_clean in nicho or nicho in t_clean:
-            return data["queries_maps"]
+    local = resolve_niche(t)
+    if local:
+        return local["queries"]
 
     # 2. Consultar a Ollama en paralelo si no está en el dict
     prompt = f"""Eres un experto en búsquedas de Google Maps en Colombia. 
@@ -41,8 +32,8 @@ Usa términos en español colombiano."""
             vars_ia = json.loads(content)
             if isinstance(vars_ia, list) and len(vars_ia) > 0:
                 return vars_ia
-    except Exception:
-        pass # Silencioso para no ensuciar logs de threads
+    except Exception as exc:
+        logger.debug(f"Expansor local/LLM: usando termino directo ({exc})")
     
     return [t]
 
@@ -57,7 +48,7 @@ async def expandir_query(query_input: str) -> list[str]:
     
     # Si hay demasiados términos (>15), limitamos la expansión IA para evitar lentitud extrema
     if len(terminos) > 15:
-        print(f"⚠️ Demasiados términos ({len(terminos)}). Usando términos directos para optimizar.")
+        logger.info(f"Demasiados términos ({len(terminos)}). Usando términos directos para optimizar.")
         return list(dict.fromkeys(terminos))
 
     async with httpx.AsyncClient() as client:

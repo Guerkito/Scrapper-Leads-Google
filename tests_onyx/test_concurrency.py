@@ -1,72 +1,50 @@
-import sys
 import os
-import asyncio
 import random
-import time
+from concurrent.futures import ThreadPoolExecutor
 import pytest
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import db
 from sources.base_source import Lead
 
-TEST_DB = "data/test_stress.db"
-db.DB_PATH = TEST_DB
 
-pytestmark = pytest.mark.anyio
+def test_concurrent_save_no_data_loss(tmp_path):
+    """Varias conexiones insertan simultáneamente identidades que colisionan.
 
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"
-
-def cleanup_test_db():
-    db.DB_PATH = TEST_DB
-    for path in (TEST_DB, f"{TEST_DB}-wal", f"{TEST_DB}-shm"):
-        if os.path.exists(path):
-            os.remove(path)
-
-async def concurrent_save(id_task, conn):
-    lead = Lead(
-        nombre=f"Empresa Concurrente {id_task % 5}", # Solo 5 empresas diferentes para forzar colisiones
-        ciudad="Bogota",
-        nicho="Stress",
-        fuente=f"fuente_{id_task}",
-        telefono=str(random.randint(1000000, 9999999))
-    )
-    # En un entorno real, cada tarea podría intentar abrir su propia conexión o usar una compartida
-    # SQLite WAL maneja múltiples lectores y un escritor.
-    success = db.save_lead(lead, conn)
-    return success
-
-async def test_concurrency():
-    db.DB_PATH = TEST_DB
-    cleanup_test_db()
+    Regresión del bug de carrera: dos hilos pasaban `_find_existing_id` antes de
+    que ninguno hiciera INSERT y el segundo lanzaba IntegrityError perdiendo sus
+    campos. Ahora el perdedor debe re-buscar y fusionar, sin pérdida de datos.
+    """
+    db.DB_PATH = str(tmp_path / "stress.db")
     db.init_db()
-    
-    conn = db.open_conn()
-    
-    print("🚀 Iniciando 100 inserciones concurrentes...")
-    tasks = [concurrent_save(i, conn) for i in range(100)]
-    results = await asyncio.gather(*tasks)
-    
-    conn.commit()
-    conn.close()
-    
-    success_count = sum(1 for r in results if r)
-    print(f"✅ Éxitos: {success_count}/100")
-    
-    assert success_count == 100
-    
-    # Verificar que solo hay 5 registros únicos por nombre/ciudad
-    conn = db.open_conn()
-    count = conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
-    conn.close()
-    
-    print(f"📊 Registros finales en DB: {count}")
-    assert count == 5
-    
-    cleanup_test_db()
-    print("✅ Stress Test (Concurrencia) PASSED")
 
-if __name__ == "__main__":
-    asyncio.run(test_concurrency())
+    def worker(i):
+        conn = db.open_conn()
+        try:
+            lead = Lead(
+                nombre=f"Empresa Concurrente {i % 5}",  # 5 identidades que colisionan
+                ciudad="Bogotá",
+                nicho="Stress",
+                fuente=f"fuente_{i}",
+                telefono=str(random.randint(1000000, 9999999)),
+                email=f"empresa{i % 5}@test.com",
+            )
+            result = db.save_lead(lead, conn)
+            conn.commit()  # cada hilo persiste su transacción (como el orquestador)
+            return result
+        finally:
+            conn.close()
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(worker, range(100)))
+
+    # Ninguna inserción/fusión debe fallar.
+    assert all(r >= 0 for r in results), f"guardados con error: {sum(1 for r in results if r < 0)}"
+
+    with db.open_conn() as conn:
+        count = conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
+        emails = {
+            row[0] for row in conn.execute("SELECT DISTINCT email FROM leads")
+        }
+        # Solo las 5 identidades únicas, y sus emails enriquecieron las fichas.
+        assert count == 5
+        assert emails == {f"empresa{i}@test.com" for i in range(5)}
