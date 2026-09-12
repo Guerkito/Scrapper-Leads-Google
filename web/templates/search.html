@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <b>🪄 Generar mi oferta desde mi web</b>
+  <p class="muted small">El asistente local lee qué vendes y crea una campaña con tus tipos de cliente y términos de búsqueda.</p>
+  <form class="inline" method="post" action="/icp">
+    <div style="flex:1; min-width:260px">
+      <label>Web de tu negocio</label>
+      <input name="site_url" placeholder="https://minegocio.com" autocomplete="off">
+    </div>
+    <button class="secondary" type="submit">Analizar mi web</button>
+  </form>
+</div>
+
+<form method="post" action="/search/start">
+  <div class="panel">
+    <div class="grid3">
+      <div>
+        <label>¿Qué quieres vender?</label>
+        <select name="campaign">
+          {% for c in campaigns %}
+          <option value="{{ c.key }}" {% if c.key == prefill.campaign %}selected{% endif %}>{{ c.label }}</option>
+          {% endfor %}
+        </select>
+        <div class="fieldset">
+          <legend>Tipos de cliente (solo aplica a la campaña elegida)</legend>
+          {% for c in campaigns %}
+            {% if c.segments %}
+            <p class="muted small" style="margin:8px 0 2px">{{ c.label }}</p>
+            {% for s in c.segments %}
+              {% set paused_key = (c.key, s.key) %}
+              <label class="check"><input type="checkbox" name="segments" value="{{ s.key }}"
+                {% if paused_key not in paused and (c.key != prefill.campaign or s.key in prefill.segments) %}checked{% endif %}>
+                {{ s.label }}{% if paused_key in paused %} <span class="pill muted">pausado</span>{% endif %}
+              </label>
+            {% endfor %}
+            {% endif %}
+          {% endfor %}
+        </div>
+        <div style="margin-top:10px">
+          <label>Clientes objetivo (búsqueda libre, separados por coma)</label>
+          <textarea name="queries" rows="2" placeholder="restaurantes, odontólogos, gimnasios">{{ prefill.queries }}</textarea>
+        </div>
+      </div>
+      <div>
+        <label>País</label>
+        <select name="country">
+          {% for country in countries %}<option {% if country == prefill.country %}selected{% endif %}>{{ country }}</option>{% endfor %}
+        </select>
+        <div style="margin-top:10px">
+          <label>Ciudades (separadas por coma o salto de línea)</label>
+          <textarea name="cities" rows="4" placeholder="Bogotá, Medellín">{{ prefill.cities }}</textarea>
+        </div>
+        <div style="margin-top:10px">
+          <label>Cantidad por ciudad</label>
+          <input type="number" name="limit" value="{{ prefill.limit }}" min="5" max="500">
+        </div>
+      </div>
+      <div>
+        <label>Dónde buscar</label>
+        {% for source in sources %}
+        <label class="check"><input type="checkbox" name="sources" value="{{ source }}"
+          {% if source in prefill.sources %}checked{% endif %}> {{ source }}</label>
+        {% endfor %}
+        <div style="margin-top:10px">
+          <label class="check"><input type="checkbox" name="cold_call" {% if prefill.cold_call %}checked{% endif %}> Priorizar teléfonos (rápido)</label>
+          <label class="check"><input type="checkbox" name="hunter" {% if prefill.hunter %}checked{% endif %}> Solo negocios sin web</label>
+          <label class="check"><input type="checkbox" name="deep" {% if prefill.deep %}checked{% endif %}> Explorar por cuadrículas</label>
+          <label class="check"><input type="checkbox" name="sweep_all"> Buscar todos los sectores</label>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button type="submit">Iniciar búsqueda</button>
+      <div class="inline" style="margin:0">
+        <div><label>Guardar como</label><input name="favorite_name" placeholder="Restaurantes Bogotá"></div>
+        <div><label>Carpeta</label><input name="favorite_folder" placeholder="General"></div>
+        <button class="secondary" type="submit" formaction="/search/save">Guardar búsqueda</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div id="mission-live" hx-get="/search/progress" hx-trigger="load, every 2s" hx-swap="innerHTML"></div>
+{% endblock %}

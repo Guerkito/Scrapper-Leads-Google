@@ -15,6 +15,7 @@ from sources.yelp import YelpSource
 from sources.glassdoor import GlassdoorSource
 from geo_data import GEO_DATA
 from db import DB_PATH
+from engine.icp_builder import build_icp
 from services.constants import NICHOS_DICT, get_offer_suggestion
 from services.product_campaigns import (
     FREE_CAMPAIGN,
@@ -24,12 +25,21 @@ from services.product_campaigns import (
     default_segments,
     get_campaign,
     recommended_sources,
+    register_custom_campaign,
     segment_label,
     segment_options,
     valid_segments,
 )
 from services.search_mission import SearchMission
+from services.campaign_analytics import paused_segment_keys
 from ui.icons import svg_icon, title_html
+
+
+def _active_default_segments(campaign_key):
+    """Segmentos por defecto menos los pausados por bajo rendimiento."""
+    defaults = default_segments(campaign_key)
+    paused = {segment for _, segment in paused_segment_keys(campaign_key)}
+    return [segment for segment in defaults if segment not in paused] or defaults
 
 
 @st.fragment(run_every=2)
@@ -47,28 +57,34 @@ def _render_mission_monitor(mission):
         return
     st.session_state.mission_was_running = True
     with st.container(border=True):
-        mc1, mc2 = st.columns([2, 1])
+        mc1, mc2 = st.columns([2.2, 1])
         with mc1:
-            st.markdown(title_html("MISIÓN EN CURSO", "bolt", 3), unsafe_allow_html=True)
-            st.write("Capturando datos en segundo plano. Puedes cambiar de pestaña dentro de la app.")
-            if mission_state.get("product_campaign") != FREE_CAMPAIGN:
-                st.caption(
-                    f"Campaña activa: {campaign_label(mission_state['product_campaign'])}"
+            st.markdown(
+                "<div style='display:flex;align-items:center;gap:10px'>"
+                "<span class='mission-status'>Misión en curso</span>"
+                + (
+                    f"<span class='onyx-chip blue'>{html.escape(campaign_label(mission_state['product_campaign']))}</span>"
+                    if mission_state.get("product_campaign") != FREE_CAMPAIGN
+                    else ""
                 )
+                + "</div>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Capturando datos en segundo plano. Puedes cambiar de pestaña dentro de la app.")
+            m1, m2 = st.columns(2)
+            if mission_state["cold_call_mode"]:
+                m1.metric("Teléfonos únicos listos", mission_state["callable_phones_found"])
+            else:
+                m1.metric("Leads nuevos en esta misión", mission_state["total_processed"])
+            m2.metric("Duplicados detectados", mission_state["total_duplicates"])
         with mc2:
-            if st.button("ABORTAR MISIÓN", type="primary", width="stretch"):
+            if st.button("Abortar misión", type="primary", width="stretch"):
                 mission.stop()
                 st.rerun()
-        if mission_state["cold_call_mode"]:
-            st.metric(
-                "Teléfonos únicos listos",
-                mission_state["callable_phones_found"],
-            )
-        else:
-            st.metric("Leads nuevos en esta misión", mission_state["total_processed"])
         if mission_state["logs"]:
-            logs = "\n".join(mission_state["logs"][-8:])
-            st.code(logs, language=None)
+            with st.expander("Registro de captura", expanded=False):
+                logs = "\n".join(mission_state["logs"][-12:])
+                st.code(logs, language=None)
 
 def render_search_view():
     if 'MISSION' not in st.session_state:
@@ -115,23 +131,7 @@ def render_search_view():
         st.session_state.query_tags = tags
         st.session_state.multiselect_tags = tags
 
-    st.markdown(title_html("Buscar nuevos clientes", "search", 2), unsafe_allow_html=True)
-    st.caption(
-        "Configura qué quieres vender, a quién buscas y en qué zona. "
-        "ONYX preparará la lista y el argumento comercial."
-    )
-
     with st.container(border=True):
-        st.markdown(
-            "<div class='workflow-steps'>"
-            "<div class='workflow-step'><b>1</b> Oferta</div>"
-            "<div class='workflow-step'><b>2</b> Cliente ideal</div>"
-            "<div class='workflow-step'><b>3</b> Zona y fuentes</div>"
-            "<div class='workflow-step'><b>4</b> Crear lista</div>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
         barrido_total = bool(st.session_state.get("search_sweep_all", False))
         if barrido_total:
             st.warning(
@@ -139,13 +139,59 @@ def render_search_view():
                 "para recorrer todos los sectores disponibles."
             )
 
+        st.markdown(
+            "<div class='workflow-steps'>"
+            "<div class='workflow-step is-active'><b>1</b> Oferta</div>"
+            "<div class='workflow-step is-active'><b>2</b> Cliente ideal</div>"
+            "<div class='workflow-step is-active'><b>3</b> Zona y fuentes</div>"
+            "<div class='workflow-step'><b>4</b> Crear lista</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        with st.expander("🪄 Generar mi oferta desde mi web"):
+            st.caption(
+                "Pega la web de tu negocio: el asistente local lee qué vendes y crea la "
+                "campaña con sus tipos de cliente y términos de búsqueda."
+            )
+            icp_url = st.text_input(
+                "Web de tu negocio", key="icp_site_url", placeholder="https://minegocio.com",
+                autocomplete="off", disabled=barrido_total,
+            )
+            if st.button("Analizar mi web", key="icp_build_btn", disabled=barrido_total):
+                if not icp_url.strip():
+                    st.warning("Escribe la URL de tu web.")
+                else:
+                    with st.spinner("El asistente está leyendo tu web…"):
+                        try:
+                            icp = build_icp(icp_url)
+                            new_campaign = register_custom_campaign(icp)
+                        except Exception as exc:
+                            st.error(str(exc))
+                        else:
+                            selected = _active_default_segments(new_campaign)
+                            st.session_state.search_product_campaign = new_campaign
+                            st.session_state.search_target_segments = selected
+                            st.session_state.query_tags = build_search_terms(new_campaign, selected)
+                            st.session_state.multiselect_tags = list(st.session_state.query_tags)
+                            st.session_state.search_sources = recommended_sources(new_campaign)
+                            st.session_state.icp_last_result = icp
+                            st.rerun()
+            icp_last = st.session_state.get("icp_last_result")
+            if icp_last:
+                st.success(f"Oferta lista: {icp_last['negocio']}")
+                st.caption(
+                    f"**Propuesta:** {icp_last['pitch']}  \n"
+                    f"**A quién contactar:** {' · '.join(icp_last['roles_decision'])}"
+                )
+
         product_keys = campaign_options()
         if st.session_state.get("search_product_campaign") not in product_keys:
             st.session_state.search_product_campaign = FREE_CAMPAIGN
 
         def _sync_product_campaign():
             selected_campaign = st.session_state.search_product_campaign
-            selected_segments = default_segments(selected_campaign)
+            selected_segments = _active_default_segments(selected_campaign)
             campaign_terms = build_search_terms(selected_campaign, selected_segments)
             st.session_state.search_target_segments = selected_segments
             st.session_state.query_tags = campaign_terms
@@ -169,7 +215,7 @@ def render_search_view():
                 campaign_key, st.session_state.get("search_target_segments")
             )
             if not current_segments:
-                current_segments = default_segments(campaign_key)
+                current_segments = _active_default_segments(campaign_key)
             st.session_state.search_target_segments = current_segments
 
             def _sync_target_segments():
@@ -204,6 +250,12 @@ def render_search_view():
                 + "</div>",
                 unsafe_allow_html=True,
             )
+            paused_here = {segment for _, segment in paused_segment_keys(campaign_key)}
+            if paused_here:
+                st.caption(
+                    f"⏸ {len(paused_here)} tipo(s) de cliente pausado(s) por bajo rendimiento. "
+                    "Gestiónalos en la pestaña Analítica."
+                )
 
         col1, col2 = st.columns(2)
         with col1:
@@ -263,7 +315,12 @@ def render_search_view():
                     st.caption("Se generan automáticamente a partir del tipo de cliente elegido.")
                 else:
                     st.caption("Sugerencias rápidas")
-                    quick_niches = ["Colegios", "Odontólogos", "Restaurantes", "Fábricas", "Inmobiliarias"]
+                    quick_niches = [
+                        "Restaurantes", "Odontólogos", "Colegios", "Inmobiliarias",
+                        "Talleres Mecánicos", "Gimnasios", "Abogados", "Fincas Cafeteras",
+                        "Clínicas Médicas", "Distribuidoras de Alimentos", "Barberías",
+                        "Veterinarias",
+                    ]
                     for idx, qn in enumerate(quick_niches):
                         if idx % 3 == 0:
                             q_cols = st.columns(3)
@@ -293,7 +350,7 @@ def render_search_view():
                         on_change=_add_custom_tag
                     )
 
-                # Mostrar etiquetas agregadas de forma Premium y limpia inline
+                # Mostrar etiquetas agregadas de forma limpia inline
                 if st.session_state.query_tags and not campaign_active:
                     tags_html = "".join(
                         f"<span class='premium-badge'>{html.escape(t.strip())}</span>"
@@ -386,6 +443,8 @@ def render_search_view():
             cold_call_mode = False
         if cold_call_mode:
             st.caption("Usará Maps y, en Colombia, Páginas Amarillas. La meta se aplica por ciudad.")
+        elif not barrido_total:
+            st.caption("Búsqueda completa: también enriquecerá cada web para capturar emails, redes y WhatsApp.")
 
         limit_sel = st.number_input(
             "Cantidad objetivo por ciudad" if cold_call_mode else "Cantidad máxima por zona",
@@ -424,18 +483,28 @@ def render_search_view():
                 favs = pd.DataFrame()
             conn_fav.close()
             if not favs.empty:
-                selected_fav = st.selectbox("Cargar una búsqueda", ["Seleccionar..."] + favs['nombre'].tolist())
-                if selected_fav != "Seleccionar...":
-                    selected_row = favs[favs["nombre"] == selected_fav].iloc[0]
-                    st.caption(
-                        f"{selected_row.get('nicho', '')} · "
-                        f"{selected_row.get('pais', '')} · "
-                        f"{selected_row.get('ciudades', '')}"
-                    )
-                    if st.button("Aplicar favorito", key="apply_search_favorite"):
-                        st.session_state.pending_search_favorite = selected_row.to_dict()
-                        st.rerun()
+                favs['carpeta'] = favs['carpeta'].fillna('General')
+                folders = ["Todas"] + sorted(favs['carpeta'].unique().tolist())
+                sel_folder = st.selectbox("Carpeta", folders, key="favorite_folder_filter")
+                pool = favs if sel_folder == "Todas" else favs[favs["carpeta"] == sel_folder]
+                if not pool.empty:
+                    pool = pool.sort_values("fecha_creacion", ascending=False)
+                    selected_fav = st.selectbox("Cargar una búsqueda", ["Seleccionar..."] + pool['nombre'].tolist())
+                    if selected_fav != "Seleccionar...":
+                        selected_row = pool[pool["nombre"] == selected_fav].iloc[0]
+                        st.caption(
+                            f"📁 {selected_row.get('carpeta', 'General')} · "
+                            f"{selected_row.get('nicho', '')} · "
+                            f"{selected_row.get('pais', '')} · "
+                            f"{str(selected_row.get('fecha_creacion', ''))[:10]}"
+                        )
+                        if st.button("Aplicar favorito", key="apply_search_favorite"):
+                            st.session_state.pending_search_favorite = selected_row.to_dict()
+                            st.rerun()
 
+            favorite_folder = st.text_input(
+                "Carpeta", placeholder="Ej. Bogotá, Abogados, Campaña Q3...", key="favorite_folder",
+            )
             favorite_name = st.text_input(
                 "Guardar esta configuración como", placeholder="Ej. Restaurantes Bogotá",
                 key="favorite_name",
@@ -449,8 +518,8 @@ def render_search_view():
                             """
                             INSERT INTO search_favorites
                                 (nombre, nicho, pais, ciudades, fuentes, limit_sel, deep_scan,
-                                 product_campaign, target_segments, cold_call_mode, hunter_mode)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 product_campaign, target_segments, cold_call_mode, hunter_mode, carpeta)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ON CONFLICT(nombre) DO UPDATE SET
                                 nicho=excluded.nicho, pais=excluded.pais,
                                 ciudades=excluded.ciudades, fuentes=excluded.fuentes,
@@ -458,7 +527,8 @@ def render_search_view():
                                 product_campaign=excluded.product_campaign,
                                 target_segments=excluded.target_segments,
                                 cold_call_mode=excluded.cold_call_mode,
-                                hunter_mode=excluded.hunter_mode
+                                hunter_mode=excluded.hunter_mode,
+                                carpeta=excluded.carpeta
                             """,
                             (
                                 favorite_name.strip(),
@@ -468,103 +538,103 @@ def render_search_view():
                                 campaign_key,
                                 json.dumps(target_segments, ensure_ascii=False),
                                 bool(cold_call_mode), bool(hunter_mode),
+                                favorite_folder.strip() or "General",
                             ),
                         )
                     st.success("Configuración guardada.")
 
-        if MISSION.running:
-            _render_mission_monitor(MISSION)
+    if MISSION.running:
+        _render_mission_monitor(MISSION)
 
-        if not MISSION.running:
-            # Calcular dinámicamente qué términos se van a buscar
-            if barrido_total:
-                display_query = "TODAS LAS EMPRESAS (BARRIDO TOTAL)"
-                final_query = "TODAS LAS EMPRESAS"
+    if not MISSION.running:
+        # Calcular dinámicamente qué términos se van a buscar
+        if barrido_total:
+            display_query = "TODAS LAS EMPRESAS (BARRIDO TOTAL)"
+            final_query = "TODAS LAS EMPRESAS"
+        else:
+            if modo_input:
+                # Capturamos también lo que el usuario haya escrito en el campo de texto pero no haya presionado Enter
+                current_typed = st.session_state.get("new_tag_input", "").strip()
+                query_list = list(st.session_state.query_tags)
+                if current_typed and current_typed not in query_list:
+                    query_list.append(current_typed)
+                final_query = ", ".join(query_list)
+                display_query = final_query
             else:
-                if modo_input:
-                    # Capturamos también lo que el usuario haya escrito en el campo de texto pero no haya presionado Enter
-                    current_typed = st.session_state.get("new_tag_input", "").strip()
-                    query_list = list(st.session_state.query_tags)
-                    if current_typed and current_typed not in query_list:
-                        query_list.append(current_typed)
-                    final_query = ", ".join(query_list)
-                    display_query = final_query
-                else:
-                    final_query = query_input
-                    display_query = query_input
+                final_query = query_input
+                display_query = query_input
 
-            # Mostrar mensaje informativo de términos a buscar de forma Premium y Estética
-            if display_query:
-                # Generamos los tags en HTML Premium
-                tags_html = "".join(
-                    f"<span class='premium-badge'>{html.escape(t.strip())}</span>"
-                    for t in display_query.split(",") if t.strip()
+        # Mostrar resumen de términos a buscar
+        if display_query:
+            tags_html = "".join(
+                f"<span class='premium-badge'>{html.escape(t.strip())}</span>"
+                for t in display_query.split(",") if t.strip()
+            )
+            st.markdown(
+                f"<div class='premium-terms-box'>"
+                f"  <div style='color:#98A2B3; font-size:0.78rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:8px;'>Búsqueda lista</div>"
+                f"  <div class='badges-wrapper'>{tags_html}</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                f"<div class='premium-terms-box' style='border-left-color: #F5A524 !important;'>"
+                f"  <div style='color:#F8C46A; font-size:0.78rem; font-weight:700; margin-bottom:8px;'>Falta el tipo de empresa</div>"
+                f"  <div style='color:#98A2B3; font-size:0.84rem;'>Selecciona una sugerencia o escribe el tipo de cliente que quieres encontrar.</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+        cold_bulk_mode = cold_call_mode and "TODOS LOS SUBNICHOS" in final_query.upper()
+        if cold_bulk_mode:
+            st.warning("Elige un nicho concreto para crear una lista de llamadas rápida.")
+        missing_campaign_segment = campaign_active and not target_segments
+        if missing_campaign_segment:
+            st.warning("Selecciona al menos un tipo de cliente para esta campaña.")
+        missing_query = not barrido_total and not final_query.strip()
+        missing_location = not ciudades_sel
+        missing_sources = not fuentes_sel and not cold_call_mode
+        if missing_location:
+            st.warning("Selecciona al menos una ciudad o municipio.")
+        if missing_sources:
+            st.warning("Selecciona al menos una fuente de búsqueda.")
+
+        if st.button(
+            "Crear lista para llamar" if cold_call_mode else "Iniciar búsqueda completa",
+            type="primary", width="stretch",
+            disabled=(
+                cold_bulk_mode or missing_campaign_segment or missing_query
+                or missing_location or missing_sources
+            ),
+        ):
+            # Si el usuario tenía algo escrito pero no presionó Enter, limpiarlo para la próxima vez
+            if modo_input and st.session_state.get("new_tag_input"):
+                st.session_state.new_tag_input = ""
+
+            if (final_query or barrido_total) and ciudades_sel and (fuentes_sel or cold_call_mode):
+                fuentes_instancias = [fuentes_opciones[f] for f in fuentes_sel]
+                if cold_call_mode:
+                    fuentes_instancias = [fuentes_opciones["Maps"]]
+                    if pais_sel == "Colombia":
+                        fuentes_instancias.append(fuentes_opciones["Páginas Amarillas"])
+                if hunter_mode:
+                    fuentes_instancias = [fuentes_opciones["Maps"]]
+
+                MISSION.start(
+                    fuentes_instancias,
+                    None,
+                    final_query,
+                    ciudades_sel,
+                    deep_scan,
+                    limit_sel,
+                    barrido_total,
+                    hunter_mode=hunter_mode,
+                    pais=pais_sel,
+                    cold_call_mode=cold_call_mode,
+                    product_campaign=(campaign_key if campaign_active else FREE_CAMPAIGN),
+                    target_segments=target_segments,
                 )
-                st.markdown(
-                    f"<div class='premium-terms-box'>"
-                    f"  <div style='color:#CBD5E1; font-size:0.8rem; font-weight:700; margin-bottom:8px;'>Búsqueda lista</div>"
-                    f"  <div class='badges-wrapper'>{tags_html}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
+                st.rerun()
             else:
-                st.markdown(
-                    f"<div class='premium-terms-box' style='border-left-color: #FFCC00 !important;'>"
-                    f"  <div style='color:#FBBF24; font-size:0.8rem; font-weight:700; margin-bottom:8px;'>Falta el tipo de empresa</div>"
-                    f"  <div style='color:#CBD5E1; font-size:0.85rem;'>Selecciona una sugerencia o escribe el tipo de cliente que quieres encontrar.</div>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
-
-            cold_bulk_mode = cold_call_mode and "TODOS LOS SUBNICHOS" in final_query.upper()
-            if cold_bulk_mode:
-                st.warning("Elige un nicho concreto para crear una lista de llamadas rápida.")
-            missing_campaign_segment = campaign_active and not target_segments
-            if missing_campaign_segment:
-                st.warning("Selecciona al menos un tipo de cliente para esta campaña.")
-            missing_query = not barrido_total and not final_query.strip()
-            missing_location = not ciudades_sel
-            missing_sources = not fuentes_sel and not cold_call_mode
-            if missing_location:
-                st.warning("Selecciona al menos una ciudad o municipio.")
-            if missing_sources:
-                st.warning("Selecciona al menos una fuente de búsqueda.")
-
-            if st.button(
-                "Crear lista para llamar" if cold_call_mode else "Iniciar búsqueda completa",
-                type="primary", width="stretch",
-                disabled=(
-                    cold_bulk_mode or missing_campaign_segment or missing_query
-                    or missing_location or missing_sources
-                ),
-            ):
-                # Si el usuario tenía algo escrito pero no presionó Enter, limpiarlo para la próxima vez
-                if modo_input and st.session_state.get("new_tag_input"):
-                    st.session_state.new_tag_input = ""
-
-                if (final_query or barrido_total) and ciudades_sel and (fuentes_sel or cold_call_mode):
-                    fuentes_instancias = [fuentes_opciones[f] for f in fuentes_sel]
-                    if cold_call_mode:
-                        fuentes_instancias = [fuentes_opciones["Maps"]]
-                        if pais_sel == "Colombia":
-                            fuentes_instancias.append(fuentes_opciones["Páginas Amarillas"])
-                    if hunter_mode:
-                        fuentes_instancias = [fuentes_opciones["Maps"]]
-
-                    MISSION.start(
-                        fuentes_instancias,
-                        None,
-                        final_query,
-                        ciudades_sel,
-                        deep_scan,
-                        limit_sel,
-                        barrido_total,
-                        hunter_mode=hunter_mode,
-                        pais=pais_sel,
-                        cold_call_mode=cold_call_mode,
-                        product_campaign=(campaign_key if campaign_active else FREE_CAMPAIGN),
-                        target_segments=target_segments,
-                    )
-                    st.rerun()
-                else:
-                    st.warning("Completa los campos necesarios para iniciar.")
+                st.warning("Completa los campos necesarios para iniciar.")

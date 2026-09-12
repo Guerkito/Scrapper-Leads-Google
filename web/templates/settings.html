@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="post" action="/settings">
+  {% for group, fields in groups.items() %}
+  <div class="panel">
+    <b>{{ group }}</b>
+    <div class="grid3" style="margin-top:10px">
+      {% for field in fields %}
+      <div>
+        <label>{{ field.key }}</label>
+        <input name="{{ field.key }}" value="{{ field.value }}"
+               type="{{ 'password' if field.secret else 'text' }}" autocomplete="off">
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  <p class="muted small">Los campos vacíos no se guardan (así no borras claves por accidente). Los cambios de envío se aplican al instante; las URLs/API del sistema requieren reiniciar el panel.</p>
+  <button type="submit">Guardar configuración</button>
+</form>
+{% endblock %}

@@ -4,6 +4,7 @@ import datetime
 import config  # carga .env y centraliza configuración
 from db import init_db, DB_PATH
 from ui.styles import apply_styles
+from ui.dashboard import render_dashboard_view
 from ui.search import render_search_view
 from ui.crm import render_crm_view
 from ui.map import render_map_view
@@ -11,7 +12,8 @@ from ui.analytics import render_analytics_view
 from ui.whatsapp import render_whatsapp_view
 from ui.email import render_email_view
 from ui.admin import render_admin_view
-from ui.helpers import overview_strip
+from ui.icons import svg_icon
+from ui.search_library import render_search_library_view
 from services.leads import load_all_leads
 from services.whatsapp_service import render_whatsapp_status_sidebar
 
@@ -36,8 +38,56 @@ if 'last_summary'      not in st.session_state: st.session_state.last_summary = 
 # ---------------------------------------------------------------------------
 # Page Config
 # ---------------------------------------------------------------------------
-st.set_page_config(page_title="Lead Gen ONYX", layout="wide")
+st.set_page_config(page_title="ONYX LeadGen", layout="wide")
 apply_styles()
+
+PAGE_META = {
+    "Inicio": {
+        "kicker": "Centro de mando", "title": "ONYX LeadGen",
+        "subtitle": "Encuentra, prioriza y contacta clientes potenciales.",
+        "icon": "dashboard",
+    },
+    "Búsqueda": {
+        "kicker": "Exploración", "title": "Buscar clientes",
+        "subtitle": "Define qué vendes, a quién buscas y en qué zona. ONYX prepara la lista y el argumento comercial.",
+        "icon": "search",
+    },
+    "Búsquedas": {
+        "kicker": "Gestión", "title": "Búsquedas guardadas",
+        "subtitle": "Entra a cada búsqueda: CRM, mapa, analítica y campañas de esa lista. También puedes borrarla.",
+        "icon": "folder",
+    },
+    "CRM": {
+        "kicker": "Gestión", "title": "Leads y oportunidades",
+        "subtitle": "Filtra, prioriza y abre cada prospecto para preparar el contacto.",
+        "icon": "crm",
+    },
+    "Mapa": {
+        "kicker": "Gestión", "title": "Inteligencia geográfica",
+        "subtitle": "Ubica cada oportunidad en el territorio y huele las zonas calientes.",
+        "icon": "map",
+    },
+    "Analítica": {
+        "kicker": "Gestión", "title": "Rendimiento",
+        "subtitle": "Métricas de captura, calidad de datos y madurez digital de la base.",
+        "icon": "chart",
+    },
+    "WhatsApp": {
+        "kicker": "Comunicación", "title": "Campañas WhatsApp",
+        "subtitle": "Envía con control anti-ban y automatiza respuestas con Evolution API + Ollama.",
+        "icon": "whatsapp",
+    },
+    "Email": {
+        "kicker": "Comunicación", "title": "Campañas de correo",
+        "subtitle": "Personaliza plantillas por lead y dispara con pausas de seguridad.",
+        "icon": "mail",
+    },
+    "Admin": {
+        "kicker": "Sistema", "title": "Administración",
+        "subtitle": "Auditoría, respaldos, importación y configuración del sistema.",
+        "icon": "settings",
+    },
+}
 
 # ---------------------------------------------------------------------------
 # Sidebar
@@ -45,96 +95,81 @@ apply_styles()
 with st.sidebar:
     st.markdown("""
         <div class='onyx-logo'>
-            LEAD GEN
-            <span>ONYX</span>
+            <span class='l1'>LeadGen</span>
+            <span class='l2'>ONYX</span>
         </div>
-        <div class='onyx-version'>Prospección comercial &nbsp;·&nbsp; v3.0</div>
+        <div class='onyx-version'>Prospección comercial</div>
     """, unsafe_allow_html=True)
     st.divider()
 
-    st.markdown("<p class='sidebar-label'>Conexiones</p>", unsafe_allow_html=True)
+    st.markdown("<p class='sidebar-label'>Exploración</p>", unsafe_allow_html=True)
 
-    render_whatsapp_status_sidebar()
+    def _nav(view_id):
+        st.session_state.view = view_id
 
-    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-    if st.button("Administración", width="stretch", type="secondary"):
-        st.session_state.view = "Admin"
+    nav_sections = [
+        ("Exploración", [("Inicio", "Inicio"), ("Buscar clientes", "Búsqueda")]),
+        ("Gestión", [("Búsquedas", "Búsquedas"), ("CRM", "CRM"), ("Mapa", "Mapa"), ("Analítica", "Analítica")]),
+        ("Comunicación", [("WhatsApp", "WhatsApp"), ("Email", "Email")]),
+    ]
+    for section_title, items in nav_sections:
+        if section_title != "Exploración":
+            st.markdown(
+                "<div style='height:14px'></div>", unsafe_allow_html=True,
+            )
+            st.markdown(f"<p class='sidebar-label'>{section_title}</p>", unsafe_allow_html=True)
+        for label, view_id in items:
+            st.button(
+                label,
+                key=f"nav_{view_id}",
+                width="stretch",
+                type="primary" if st.session_state.view == view_id else "secondary",
+                on_click=_nav,
+                args=(view_id,),
+            )
+
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+    st.markdown("<p class='sidebar-label'>Sistema</p>", unsafe_allow_html=True)
+    st.button(
+        "Administración", key="nav_admin", width="stretch",
+        type="primary" if st.session_state.view == "Admin" else "secondary",
+        on_click=_nav, args=("Admin",),
+    )
 
     st.divider()
+    st.markdown("<p class='sidebar-label'>Conexiones</p>", unsafe_allow_html=True)
+    render_whatsapp_status_sidebar()
+
     st.caption(f"ONYX © {datetime.date.today().year}")
 
 # ---------------------------------------------------------------------------
-# Header & Metrics
+# View header
 # ---------------------------------------------------------------------------
-st.markdown("""
-    <div class='onyx-header'>
-        ONYX <span class='onyx-header-red'>LeadGen</span>
-    </div>
-    <div class='onyx-subtitle'>Encuentra, prioriza y contacta clientes potenciales</div>
-""", unsafe_allow_html=True)
-
-df_all = load_all_leads()
-
-if not df_all.empty:
-    oro_count = len(df_all[df_all['calificacion'] == 'oro'])
-    if 'telefono_e164' in df_all.columns:
-        callable_count = df_all['telefono_e164'].fillna("").astype(str).str.startswith("+").sum()
-    else:
-        callable_count = df_all['telefono'].fillna("").astype(str).str.len().ge(7).sum()
-else:
-    oro_count, callable_count = 0, 0
-
-# ---------------------------------------------------------------------------
-# Navbar
-# ---------------------------------------------------------------------------
-btns = [
-    ("Buscar clientes", "Búsqueda"),
-    ("CRM", "CRM"),
-    ("Mapa", "Mapa"),
-    ("Resultados", "Analytics"),
-    ("WhatsApp", "WhatsApp"),
-    ("Correo", "Email")
-]
-
-with st.container(key="main_navigation"):
-    nav_cols = st.columns([1,1,1,1,1,1])
-
-    def _navigate(view_id):
-        st.session_state.view = view_id
-
-    for i, (label, view_id) in enumerate(btns):
-        is_active = st.session_state.view == view_id
-        nav_cols[i].button(
-            label,
-            width="stretch",
-            key=f"nav_{view_id}",
-            type="primary" if is_active else "secondary",
-            on_click=_navigate,
-            args=(view_id,),
-        )
-
+view_mode = st.session_state.view
+meta = PAGE_META.get(view_mode, PAGE_META["Inicio"])
 st.markdown(
-    overview_strip([
-        ("Base de leads", f"{len(df_all):,}", "total guardado"),
-        ("Listos para llamar", f"{int(callable_count):,}", "teléfono válido"),
-        ("Alta prioridad", f"{oro_count:,}", "calificación oro"),
-        ("Esta sesión", f"{st.session_state.total_session:,}", "leads nuevos"),
-    ]),
+    f"<div class='page-kicker' style='display:flex;align-items:center;gap:6px'>{svg_icon(meta['icon'], 12)} {meta['kicker']}</div>"
+    f"<div class='onyx-header'>{meta['title']}</div>"
+    f"<div class='onyx-subtitle'>{meta['subtitle']}</div>",
     unsafe_allow_html=True,
 )
+
+df_all = load_all_leads()
 
 # ---------------------------------------------------------------------------
 # Main Content area
 # ---------------------------------------------------------------------------
-view_mode = st.session_state.view
-
-if view_mode == "Búsqueda":
+if view_mode == "Inicio":
+    render_dashboard_view(df_all)
+elif view_mode == "Búsqueda":
     render_search_view()
+elif view_mode == "Búsquedas":
+    render_search_library_view()
 elif view_mode == "CRM":
     render_crm_view(df_all)
 elif view_mode == "Mapa":
     render_map_view(df_all)
-elif view_mode == "Analytics":
+elif view_mode == "Analítica":
     render_analytics_view(df_all)
 elif view_mode == "WhatsApp":
     render_whatsapp_view(df_all)

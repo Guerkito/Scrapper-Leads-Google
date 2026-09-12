@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import unicodedata
 
+from loguru import logger
+
+from config import DB_PATH
+
 
 FREE_CAMPAIGN = "busqueda_libre"
+CUSTOM_CAMPAIGNS_PATH = os.path.join(os.path.dirname(DB_PATH), "custom_campaigns.json")
 
 
 PRODUCT_CAMPAIGNS = {
@@ -339,6 +346,68 @@ def campaign_options() -> list[str]:
     return list(PRODUCT_CAMPAIGNS)
 
 
+def _campaign_key(label: str) -> str:
+    slug = _normalize(label).replace(" ", "_")[:40].strip("_")
+    return f"web_{slug}" if slug else "web_custom"
+
+
+def register_custom_campaign(icp: dict) -> str:
+    """Convierte un ICP generado desde la web en una campaña usable por el motor."""
+    segments: dict[str, dict] = {}
+    for index, item in enumerate(icp.get("segmentos") or [], start=1):
+        segment_key = _normalize(item.get("label")).replace(" ", "_")[:30].strip("_")
+        segment_key = segment_key or f"segmento_{index}"
+        while segment_key in segments:
+            segment_key += "_"
+        segments[segment_key] = {
+            "label": str(item.get("label") or "").strip(),
+            "queries": list(item.get("queries") or []),
+        }
+    if not segments:
+        raise ValueError("El ICP no tiene segmentos válidos.")
+
+    key = _campaign_key(str(icp.get("negocio") or ""))
+    while key in PRODUCT_CAMPAIGNS:
+        key += "_"
+    PRODUCT_CAMPAIGNS[key] = {
+        "label": f"Mi oferta · {str(icp.get('negocio') or '')[:60]}",
+        "description": str(icp.get("negocio") or "").strip(),
+        "pitch": str(icp.get("pitch") or "").strip(),
+        "decision_roles": list(icp.get("roles_decision") or ["Gerencia"]),
+        "recommended_sources": ["Maps"],
+        "segments": segments,
+        "custom": True,
+    }
+    _save_custom_campaigns()
+    return key
+
+
+def _save_custom_campaigns() -> None:
+    custom = {key: data for key, data in PRODUCT_CAMPAIGNS.items() if data.get("custom")}
+    try:
+        os.makedirs(os.path.dirname(CUSTOM_CAMPAIGNS_PATH), exist_ok=True)
+        with open(CUSTOM_CAMPAIGNS_PATH, "w", encoding="utf-8") as handle:
+            json.dump(custom, handle, ensure_ascii=False, indent=2)
+    except Exception as exc:
+        logger.warning(f"No se pudieron guardar las campañas personalizadas: {exc}")
+
+
+def _load_custom_campaigns() -> None:
+    try:
+        with open(CUSTOM_CAMPAIGNS_PATH, encoding="utf-8") as handle:
+            saved = json.load(handle)
+    except FileNotFoundError:
+        return
+    except Exception as exc:
+        logger.warning(f"No se pudieron cargar las campañas personalizadas: {exc}")
+        return
+    if not isinstance(saved, dict):
+        return
+    for key, data in saved.items():
+        if isinstance(data, dict) and data.get("segments"):
+            PRODUCT_CAMPAIGNS[key] = data
+
+
 def segment_options(campaign_key: str | None) -> list[str]:
     return list(get_campaign(campaign_key).get("segments", {}))
 
@@ -488,3 +557,6 @@ def apply_campaign_context(
     lead.decision_roles = " · ".join(campaign["decision_roles"])
     lead.source_query = source_query
     return lead
+
+
+_load_custom_campaigns()

@@ -2,6 +2,7 @@ import asyncio
 import threading
 import random
 import datetime
+import uuid
 from engine.orchestrator import Orchestrator
 from services.constants import NICHOS_DICT
 from services.leads import invalidate_leads_cache
@@ -79,9 +80,11 @@ class SearchMission:
         with self._lock:
             if self.running:
                 return False
+            self.mision_id = uuid.uuid4().hex[:12]
             self.orchestrator = Orchestrator(
                 sources, log_callback=log_cb, lead_callback=count_cb
             )
+            self.orchestrator.mision_id = self.mision_id
             self.running = True
             self.total_processed = 0
             self.total_duplicates = 0
@@ -200,6 +203,7 @@ class SearchMission:
                             total_processed, total_duplicates, history_conn,
                             product_campaign=product_campaign,
                             target_segments=target_segments,
+                            mision_id=self.mision_id,
                         )
                 except Exception as history_error:
                     if self.orchestrator:

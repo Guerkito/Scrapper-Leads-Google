@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="kpis">
+  <div class="kpi"><b>{{ "{:,}".format(total) }}</b><span>Leads en base</span></div>
+  <div class="kpi"><b>{{ with_answer }}</b><span>Respondieron</span></div>
+  <div class="kpi"><b>{{ "{:,}".format(summary.total) }}</b><span>Correos enviados</span></div>
+  <div class="kpi"><b>{{ (summary.tasa_respuesta * 100) | round | int }}%</b><span>Tasa de respuesta</span></div>
+</div>
+
+<div class="grid2" style="margin-top:18px">
+  <div class="panel">
+    <div class="row"><b>Embudo por estado</b><span class="muted small">última captura primero abajo</span></div>
+    <table>
+      {% for row in funnel %}
+      <tr><td>{{ row['estado'] }}</td><td style="text-align:right">{{ row['n'] }}</td></tr>
+      {% else %}
+      <tr><td class="muted">Sin leads todavía.</td></tr>
+      {% endfor %}
+    </table>
+    <p style="margin-top:12px"><a class="btn" href="/search">Buscar clientes</a></p>
+  </div>
+  <div class="panel">
+    <b>Distribución</b>
+    {% if chart_values %}
+    <canvas id="funnelChart" height="150"></canvas>
+    {% else %}
+    <p class="muted small">Sin datos todavía.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid2" style="margin-top:0">
+  <div class="panel" style="grid-column: 1 / -1">
+    <div class="row"><b>Últimos leads</b><a class="small" href="/crm">Ver CRM →</a></div>
+    <table>
+      {% for lead in recent %}
+      <tr>
+        <td><a href="/leads/{{ lead['id'] }}">{{ lead['nombre'] }}</a><div class="muted small">{{ lead['ciudad'] or '' }} · {{ lead['nicho'] or '' }}</div></td>
+        <td style="text-align:right"><span class="pill muted">{{ lead['estado'] or 'Nuevo' }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td class="muted">Aún no hay leads. Empieza en «Buscar clientes».</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+{% if chart_values %}
+<script>
+new Chart(document.getElementById('funnelChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ chart_labels | tojson }},
+    datasets: [{ data: {{ chart_values | tojson }}, backgroundColor: '#E5484D', borderRadius: 6 }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#98A2B3' }, grid: { display: false } },
+      y: { ticks: { color: '#98A2B3' }, grid: { color: '#232D45' }, beginAtZero: true }
+    }
+  }
+});
+</script>
+{% endif %}
+
+{% if mission.running %}
+<div class="panel">
+  <span class="pill live">Misión en curso</span>
+  {{ mission.total_processed }} nuevos · {{ mission.total_duplicates }} duplicados ·
+  <a href="/search">ver progreso</a>
+</div>
+{% endif %}
+{% endblock %}

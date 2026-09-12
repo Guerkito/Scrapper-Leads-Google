@@ -1,0 +1,27 @@
+{% if campaign.running %}
+<div class="panel">
+  <div class="row">
+    <b><span class="pill live">Campaña de WhatsApp en curso</span></b>
+    <form method="post" action="/whatsapp/stop"><button class="danger" type="submit">Detener</button></form>
+  </div>
+  <div class="bar"><i style="width: {{ (campaign.progress * 100) | round | int }}%"></i></div>
+  <p class="muted small">{{ (campaign.progress * 100) | round | int }}% ·
+    {% if campaign.countdown %}próximo envío en {{ campaign.countdown }}s{% else %}enviando…{% endif %}</p>
+  <pre class="logs">{% for level, msg in campaign.logs[-10:] %}[{{ level }}] {{ msg }}
+{% endfor %}</pre>
+</div>
+{% else %}
+  {% if campaign.logs %}
+  <div class="panel">
+    <b>Campaña terminada</b>
+    <pre class="logs">{% for level, msg in campaign.logs[-8:] %}[{{ level }}] {{ msg }}
+{% endfor %}</pre>
+  </div>
+  {% endif %}
+  <script>
+    (function () {
+      var el = document.getElementById('whatsapp-live');
+      if (el && el.hasAttribute('hx-trigger')) { el.removeAttribute('hx-trigger'); }
+    })();
+  </script>
+{% endif %}

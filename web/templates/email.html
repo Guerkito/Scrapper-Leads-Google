@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <p class="muted small">
+    Proveedor: <b>{{ provider | upper }}</b> · Límite diario: <b>{{ daily_limit if daily_limit != '0' else 'sin límite' }}</b>
+    {% if not has_credentials %}<span class="pill bad">Falta EMAIL_USER</span>{% endif %}
+  </p>
+  <form method="post" action="/email/start">
+    <div class="grid2">
+      <div>
+        <label>Asunto</label>
+        <input name="subject" value="Propuesta estratégica para {nombre}">
+        <label style="margin-top:10px">Plantilla del cuerpo (HTML permitido)</label>
+        <textarea name="template" rows="10">Hola <b>{nombre}</b>,<br><br>
+Vi tu negocio de <i>{nicho}</i> en {ciudad} y noté un par de oportunidades para conseguir más clientes.<br><br>
+¿Tienes 5 minutos para una llamada breve{link_agenda}?<br><br>
+Atentamente,<br><b>Equipo de Crecimiento Onyx</b></textarea>
+        <p class="muted small">Variables: {nombre} · {nicho} · {ciudad} · {rating} · {decisor} · {link_agenda}</p>
+      </div>
+      <div>
+        <label>Estados a contactar</label>
+        {% for option in ["Nuevo", "Contactado", "Interesado", "Cerrado"] %}
+        <label class="check"><input type="checkbox" name="states" value="{{ option }}"
+          {% if option in ["Nuevo", "Interesado"] %}checked{% endif %}> {{ option }}</label>
+        {% endfor %}
+        <label class="check" style="margin-top:10px"><input type="checkbox" name="test_mode" checked> Modo simulación (sin envíos reales)</label>
+        <label class="check"><input type="checkbox" name="use_llm" checked> Personalizar con IA local (Ollama)</label>
+        <p style="margin-top:14px"><button type="submit">Iniciar envío</button></p>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div id="email-live" hx-get="/email/progress" hx-trigger="load, every 1s" hx-swap="innerHTML"></div>
+{% endblock %}

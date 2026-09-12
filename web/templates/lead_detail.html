@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid2">
+  <div class="panel">
+    <div class="row">
+      <b>{{ lead['nombre'] }}</b>
+      <span class="pill muted">{{ lead['estado'] or 'Nuevo' }}</span>
+    </div>
+    <dl class="dl">
+      <dt>Ciudad</dt><dd>{{ lead['ciudad'] or '—' }}</dd>
+      <dt>Dirección</dt><dd>{{ lead['direccion'] or '—' }}</dd>
+      <dt>Teléfono</dt><dd>{{ lead['telefono_e164'] or lead['telefono'] or '—' }}</dd>
+      <dt>Email</dt><dd>{{ lead['email'] or '—' }}</dd>
+      <dt>Web</dt><dd>{% if lead['sitio_web'] %}<a href="{{ lead['sitio_web'] }}" target="_blank" rel="noopener">{{ lead['sitio_web'] }}</a>{% else %}—{% endif %}</dd>
+      <dt>Nicho / sector</dt><dd>{{ lead['nicho'] or '—' }} · {{ lead['sector'] or '—' }}</dd>
+      <dt>Rating / reseñas</dt><dd>{{ lead['rating'] or '—' }} · {{ lead['reseñas'] or 0 }}</dd>
+      <dt>Fuentes</dt><dd class="small">{{ lead['fuentes_encontrado'] or lead['fuente'] or '—' }}</dd>
+      <dt>Calidad</dt><dd>{{ lead['calificacion'] or '—' }}</dd>
+      <dt>Última interacción</dt><dd>{{ lead['ultima_interaccion'] or '—' }}</dd>
+      <dt>Reunión</dt>
+      <dd>
+        {% if lead['reunion_at'] %}
+          {{ lead['reunion_at'] }}
+          {% if lead['reunion_url'] %} · <a href="{{ lead['reunion_url'] }}" target="_blank" rel="noopener">enlace</a>{% endif %}
+        {% else %}—{% endif %}
+      </dd>
+      <dt>Follow-ups</dt><dd>{{ lead['follow_ups_sent'] or 0 }}</dd>
+    </dl>
+  </div>
+
+  <div class="panel">
+    <b>Decisor</b>
+    <form method="post" action="/leads/{{ lead['id'] }}">
+      <div class="grid2">
+        <div><label>Estado</label>
+          <select name="estado">
+            {% for option in ["Nuevo", "Contactado", "Interesado", "Reunión", "Cerrado", "Descartado"] %}
+            <option value="{{ option }}" {% if lead['estado'] == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div><label>Contacto</label>
+          <select name="estado_contacto">
+            {% for option in ["sin_contactar", "contactado", "no_contactar"] %}
+            <option value="{{ option }}" {% if lead['estado_contacto'] == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:10px"><label>Nombre del decisor</label><input name="decisor_nombre" value="{{ lead['decisor_nombre'] or '' }}"></div>
+      <div class="grid2" style="margin-top:10px">
+        <div><label>Cargo</label><input name="decisor_cargo" value="{{ lead['decisor_cargo'] or '' }}"></div>
+        <div><label>LinkedIn</label><input name="decisor_linkedin" value="{{ lead['decisor_linkedin'] or '' }}"></div>
+      </div>
+      <div style="margin-top:10px"><label>Notas</label><textarea name="notas" rows="3">{{ lead['notas'] or '' }}</textarea></div>
+      <p style="margin-top:12px"><button type="submit">Guardar</button></p>
+    </form>
+    <form method="post" action="/leads/{{ lead['id'] }}/decisor">
+      <button class="secondary" type="submit">🤖 Buscar decisor en su web</button>
+    </form>
+  </div>
+</div>
+
+{% if opportunities %}
+<div class="panel">
+  <b>Oportunidades por campaña</b>
+  <table>
+    <tr><th>Campaña</th><th>Segmento</th><th>Fit</th><th>Motivo</th></tr>
+    {% for item in opportunities %}
+    <tr>
+      <td>{{ item['product_label'] }}</td>
+      <td>{{ item['segment_label'] or '—' }}</td>
+      <td>{{ item['fit_score'] }}%</td>
+      <td class="small muted">{{ item['fit_reason'] or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<div class="panel">
+  <b>Historial de conversación</b>
+  <pre class="logs">{{ lead['historial_mensajes'] or 'Sin mensajes todavía.' }}</pre>
+</div>
+{% endblock %}

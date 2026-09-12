@@ -36,7 +36,10 @@ def resolve_niche(value: str) -> dict | None:
                 queries = list(dict.fromkeys([niche, *synonyms]))
                 is_b2c = any(
                     token in normalize_text(sector)
-                    for token in ("salud", "gastronomia", "belleza", "mascotas", "eventos", "moda")
+                    for token in (
+                        "salud", "gastronomia", "belleza", "mascotas", "eventos",
+                        "moda", "retail", "deportes", "turismo", "hogar", "ocio",
+                    )
                 )
                 return {
                     "queries": queries,

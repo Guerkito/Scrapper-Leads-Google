@@ -58,6 +58,86 @@ EMAIL_USER = os.getenv("EMAIL_USER", "")
 EMAIL_PASS = os.getenv("EMAIL_PASS", "")  # Password o App Password
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Onyx Lead Gen")
 
+# Link de agenda (Cal.com, Calendly, etc.) que el bot y los correos comparten.
+CALCOM_LINK = os.getenv("CALCOM_LINK", "").strip()
+
+# API de Cal.com para confirmar reuniones automáticamente (requiere API key).
+CALCOM_API_KEY = os.getenv("CALCOM_API_KEY", "").strip()
+CALCOM_API_VERSION = os.getenv("CALCOM_API_VERSION", "2026-05-01").strip()
+try:
+    MEETINGS_POLL_MINUTES = max(5, int(os.getenv("MEETINGS_POLL_MINUTES", 30)))
+except ValueError:
+    MEETINGS_POLL_MINUTES = 30
+try:
+    MEETINGS_BATCH = max(1, int(os.getenv("MEETINGS_BATCH", 25)))
+except ValueError:
+    MEETINGS_BATCH = 25
+
+# ── Bandeja de entrada (IMAP) ─────────────────────────────────────────────────
+# El agente de email responde a las respuestas de los prospectos desde esta cuenta.
+# Si no se definen IMAP_*, se reutilizan EMAIL_USER / EMAIL_PASS.
+IMAP_HOST = os.getenv("IMAP_HOST", "imap.gmail.com")
+IMAP_PORT = int(os.getenv("IMAP_PORT", 993))
+IMAP_USER = os.getenv("IMAP_USER", "") or EMAIL_USER
+IMAP_PASS = os.getenv("IMAP_PASS", "") or EMAIL_PASS
+IMAP_FOLDER = os.getenv("IMAP_FOLDER", "INBOX")
+INBOX_POLL_SECONDS = max(15, int(os.getenv("INBOX_POLL_SECONDS", 60)))
+
+# ── Follow-ups automáticos ────────────────────────────────────────────────────
+# FOLLOW_UP_MAX = 0 desactiva los seguimientos. FOLLOW_UP_DAYS es la espera
+# entre toques (se cuenta desde la última interacción del lead).
+FOLLOW_UP_MAX = max(0, int(os.getenv("FOLLOW_UP_MAX", 2)))
+FOLLOW_UP_DAYS = max(1, int(os.getenv("FOLLOW_UP_DAYS", 3)))
+FOLLOW_UP_POLL_MINUTES = max(5, int(os.getenv("FOLLOW_UP_POLL_MINUTES", 60)))
+
+# ── Envío gestionado ──────────────────────────────────────────────────────────
+# SENDER_PROVIDER: "smtp" (por defecto) o "resend" (API gestionada, requiere
+# RESEND_API_KEY y un dominio verificado en Resend).
+SENDER_PROVIDER = os.getenv("SENDER_PROVIDER", "smtp").strip().lower()
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
+SENDER_FROM_EMAIL = os.getenv("SENDER_FROM_EMAIL", "").strip() or EMAIL_USER
+# Pausa los envíos al superar este número por día (0 = sin límite).
+try:
+    SENDER_DAILY_LIMIT = max(0, int(os.getenv("SENDER_DAILY_LIMIT", 0)))
+except ValueError:
+    SENDER_DAILY_LIMIT = 0
+# Coste estimado por email para el panel de rendimiento (ej. 0.001 para Resend).
+try:
+    COST_PER_EMAIL = max(0.0, float(os.getenv("COST_PER_EMAIL", 0)))
+except ValueError:
+    COST_PER_EMAIL = 0.0
+
+# ── Acceso al panel web ───────────────────────────────────────────────────────
+# Si PANEL_PASSWORD queda vacío, el panel abre sin login (solo recomendado en
+# localhost). SESSION_SECRET firma la cookie de sesión; si no se define se
+# deriva de la contraseña (cambiarla cierra todas las sesiones).
+PANEL_PASSWORD = os.getenv("PANEL_PASSWORD", "").strip()
+SESSION_SECRET = os.getenv("SESSION_SECRET", "").strip() or PANEL_PASSWORD
+try:
+    SESSION_DAYS = max(1, int(os.getenv("SESSION_DAYS", 30)))
+except ValueError:
+    SESSION_DAYS = 30
+try:
+    PANEL_MAX_UPLOAD_MB = max(1, int(os.getenv("PANEL_MAX_UPLOAD_MB", 20)))
+except ValueError:
+    PANEL_MAX_UPLOAD_MB = 20
+
+# ── Optimización automática de campañas ───────────────────────────────────────
+# AUTO_OPTIMIZE pausa segmentos sin ninguna respuesta tras OPTIMIZE_MIN_LEADS
+# leads contactados. OPTIMIZE_SCALE_RATE es la tasa de respuesta desde la que
+# el panel recomienda escalar un segmento.
+AUTO_OPTIMIZE = os.getenv("AUTO_OPTIMIZE", "true").strip().lower() in {
+    "1", "true", "si", "sí", "yes",
+}
+try:
+    OPTIMIZE_MIN_LEADS = max(1, int(os.getenv("OPTIMIZE_MIN_LEADS", 25)))
+except ValueError:
+    OPTIMIZE_MIN_LEADS = 25
+try:
+    OPTIMIZE_SCALE_RATE = max(0.0, float(os.getenv("OPTIMIZE_SCALE_RATE", 0.08)))
+except ValueError:
+    OPTIMIZE_SCALE_RATE = 0.08
+
 
 def evo_headers(extra: dict | None = None) -> dict:
     """Headers HTTP estándar para llamar a Evolution API."""

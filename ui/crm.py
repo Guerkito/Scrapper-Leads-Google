@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import hashlib
+import html
 import io
 import urllib.parse
 import zipfile
@@ -803,8 +804,6 @@ def _render_export_panel(df_all, df_filtered):
                         st.rerun()
 
 def render_crm_view(df_all):
-    st.markdown(title_html("Leads y oportunidades", "crm", 3), unsafe_allow_html=True)
-    st.caption("Filtra, prioriza y abre cada prospecto para preparar el contacto.")
     pais_sel = st.session_state.get('pais_sel', 'Colombia')
 
     # --- FILTROS GLOBALES ---
@@ -968,11 +967,18 @@ def render_crm_view(df_all):
             table_event = st.dataframe(
                 table_view,
                 width='stretch',
-                height=550,
+                height=560,
                 hide_index=True,
                 on_select="rerun",
                 selection_mode="single-row",
                 key=table_key,
+                column_config={
+                    "Afinidad": st.column_config.ProgressColumn(
+                        "Afinidad", min_value=0, max_value=100,
+                        format="%d%%",
+                    ),
+                    "Rating": st.column_config.NumberColumn("Rating", format="%.1f"),
+                },
             )
             selected_rows = getattr(getattr(table_event, "selection", None), "rows", [])
             if selected_rows:
@@ -992,7 +998,18 @@ def render_crm_view(df_all):
             lead = df_all[df_all['id'] == selected_id].iloc[0]
 
             with st.container(border=True):
-                st.markdown(title_html(str(lead['nombre']), "crm", 3), unsafe_allow_html=True)
+                estado_lead = str(lead.get('estado', 'Nuevo'))
+                estado_tone = {
+                    "Nuevo": "blue", "Contactado": "amber", "Interesado": "violet",
+                    "Cerrado": "green", "Descartado": "neutral", "Sin WhatsApp": "neutral",
+                }.get(estado_lead, "neutral")
+                st.markdown(
+                    f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap'>"
+                    f"<h3 style='margin:0!important;font-size:1.25rem!important;'>{html.escape(str(lead['nombre']))}</h3>"
+                    f"<span class='onyx-chip {estado_tone}'>{html.escape(estado_lead)}</span>"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
                 st.caption(
                     f"Lead ID {int(lead['id'])} · {lead['ciudad']} · {lead['nicho']}"
                 )
@@ -1040,16 +1057,25 @@ def render_crm_view(df_all):
                 )
                 product_pitch = lead.get('pitch_sugerido')
                 if _has_contact_value(lead.get('producto_principal')):
-                    st.success(
-                        f"**Oferta:** {lead.get('producto_principal')}  \n"
-                        f"**Cliente objetivo:** {lead.get('segmento_principal') or 'Por validar'}  \n"
-                        f"**Afinidad:** {int(lead.get('fit_score') or 0)}/100"
+                    fit_val = int(lead.get('fit_score') or 0)
+                    fit_tone = "green" if fit_val >= 70 else ("amber" if fit_val >= 40 else "neutral")
+                    pitch_html = (
+                        f"<div class='campaign-summary' style='margin:12px 0 0'>"
+                        f"<p><strong>Oferta:</strong> {html.escape(str(lead.get('producto_principal')))} "
+                        f"<span class='onyx-chip {fit_tone}' style='margin-left:6px'>{fit_val}/100 afinidad</span></p>"
+                        f"<p><strong>Cliente objetivo:</strong> {html.escape(str(lead.get('segmento_principal') or 'Por validar'))}</p>"
+                        f"<p><strong>Argumento de venta:</strong> {html.escape(str(product_pitch))}</p>"
+                        + (
+                            f"<p><strong>Buscar:</strong> {html.escape(str(lead.get('decisor_objetivo')))} </p>"
+                            if _has_contact_value(lead.get('decisor_objetivo')) else ""
+                        )
+                        + (
+                            f"<p><strong>Evidencia:</strong> {html.escape(str(lead.get('motivo_afinidad')))}</p>"
+                            if _has_contact_value(lead.get('motivo_afinidad')) else ""
+                        )
+                        + "</div>"
                     )
-                    st.info(f"**Argumento de venta:** {product_pitch}")
-                    if _has_contact_value(lead.get('decisor_objetivo')):
-                        st.caption(f"Buscar: {lead.get('decisor_objetivo')}")
-                    if _has_contact_value(lead.get('motivo_afinidad')):
-                        st.caption(f"Evidencia: {lead.get('motivo_afinidad')}")
+                    st.markdown(pitch_html, unsafe_allow_html=True)
                     qualification_note = get_campaign(
                         lead.get('campaign_key_principal')
                     ).get('qualification_note')
@@ -1128,7 +1154,7 @@ def render_crm_view(df_all):
                         action_cols[0].button("SIN TELÉFONO VÁLIDO", disabled=True, width="stretch")
                     if wa_link:
                         action_cols[1].link_button(
-                            "WHATSAPP", wa_link, width="stretch"
+                            "WHATSAPP", wa_link, width="stretch", type="primary"
                         )
                     else:
                         action_cols[1].button("SIN WHATSAPP", disabled=True, width="stretch")

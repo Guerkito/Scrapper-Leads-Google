@@ -1,0 +1,18 @@
+{% if job.running %}
+<div class="panel">
+  <div class="row"><b><span class="pill live">Analizando webs…</span></b>
+    <span class="muted small">{{ job.done }} / {{ job.total }}</span></div>
+  <div class="bar"><i style="width: {{ (job.done / job.total * 100) if job.total else 5 }}%"></i></div>
+  <p class="muted small">{{ job.message }}</p>
+</div>
+{% else %}
+  {% if job.message %}
+  <div class="panel"><b>{{ job.message }}</b> · <a href="/decisions">recargar lista</a></div>
+  {% endif %}
+  <script>
+    (function () {
+      var el = document.getElementById('decisions-live');
+      if (el && el.hasAttribute('hx-trigger')) { el.removeAttribute('hx-trigger'); }
+    })();
+  </script>
+{% endif %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <form class="inline" method="get" action="/crm">
+    <div style="flex:1; min-width:240px"><label>Buscar</label><input name="q" value="{{ q }}" placeholder="Nombre, ciudad, nicho o email"></div>
+    <div><label>Estado</label>
+      <select name="estado">
+        <option value="">Todos</option>
+        {% for option in ["Nuevo", "Contactado", "Interesado", "Reunión", "Cerrado", "Descartado"] %}
+        <option value="{{ option }}" {% if estado == option %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="secondary" type="submit">Filtrar</button>
+  </form>
+  <p class="muted small">{{ total }} lead(s) · página {{ page }} de {{ pages }}</p>
+  <table>
+    <tr><th>Negocio</th><th>Ciudad</th><th>Nicho</th><th>Contacto</th><th>Decisor</th><th>Estado</th></tr>
+    {% for lead in rows %}
+    <tr>
+      <td><a href="/leads/{{ lead['id'] }}">{{ lead['nombre'] }}</a></td>
+      <td>{{ lead['ciudad'] or '—' }}</td>
+      <td>{{ lead['nicho'] or '—' }}</td>
+      <td class="small">{{ lead['telefono_e164'] or lead['telefono'] or '—' }}<br>{{ lead['email'] or '' }}</td>
+      <td class="small">{{ lead['decisor_nombre'] or '—' }}{% if lead['decisor_cargo'] %}<br><span class="muted">{{ lead['decisor_cargo'] }}</span>{% endif %}</td>
+      <td><span class="pill muted">{{ lead['estado'] or 'Nuevo' }}</span></td>
+    </tr>
+    {% else %}
+    <tr><td class="muted" colspan="6">Sin resultados.</td></tr>
+    {% endfor %}
+  </table>
+  <p style="margin-top:12px">
+    {% if page > 1 %}<a href="/crm?q={{ q }}&estado={{ estado }}&page={{ page - 1 }}">← Anterior</a>{% endif %}
+    {% if page < pages %} <a style="margin-left:12px" href="/crm?q={{ q }}&estado={{ estado }}&page={{ page + 1 }}">Siguiente →</a>{% endif %}
+  </p>
+</div>
+{% endblock %}

@@ -13,20 +13,31 @@ def _email_campaign_monitor(campaign):
             st.rerun()
         return
     st.session_state.email_campaign_was_running = True
-    st.warning("Campaña de email en curso...")
-    st.progress(campaign.progress)
-    if campaign.countdown > 0:
-        st.info(f"Próximo envío en {campaign.countdown} segundos...")
-    with st.expander("Registro de actividad", expanded=True):
-        for level, msg in campaign.logs[-12:]:
-            getattr(st, level if level in {"success", "warning", "error"} else "caption")(msg)
-    if st.button("DETENER CAMPAÑA", type="secondary", width="stretch"):
-        campaign.stop = True
+    with st.container(border=True):
+        mc1, mc2 = st.columns([2.2, 1])
+        with mc1:
+            st.markdown(
+                "<span class='mission-status'>Campaña en curso</span>",
+                unsafe_allow_html=True,
+            )
+        with mc2:
+            if st.button("Detener campaña", type="secondary", width="stretch", key="stop_email_campaign"):
+                campaign.stop = True
+        pr1, pr2 = st.columns(2)
+        with pr1:
+            st.metric("Progreso", f"{int(campaign.progress * 100)}%")
+        with pr2:
+            if campaign.countdown > 0:
+                st.metric("Próximo envío", f"{campaign.countdown}s")
+            else:
+                st.metric("Próximo envío", "ahora")
+        st.progress(campaign.progress)
+        with st.expander("Registro de campaña", expanded=True):
+            for level, msg in campaign.logs[-12:]:
+                getattr(st, level if level in {"success", "warning", "error"} else "caption")(msg)
 
 def render_email_view(df_all):
     """Renderiza la vista de campañas de Email Marketing."""
-    st.markdown(title_html("Email Marketing (Onyx Engine)", "mail", 3), unsafe_allow_html=True)
-
     # Inicializar estado de la campaña si no existe
     if 'EMAIL_CAMP' not in st.session_state:
         st.session_state.EMAIL_CAMP = CampState()
@@ -35,14 +46,14 @@ def render_email_view(df_all):
 
     # Contenedor principal de configuración
     with st.container(border=True):
-        st.markdown(title_html("Configuración de Campaña", "settings", 4), unsafe_allow_html=True)
+        st.markdown(title_html("Configuración de campaña", "settings", 4), unsafe_allow_html=True)
         
         c1, c2 = st.columns([2, 1])
         
         with c1:
             subject = st.text_input(
                 "Asunto del Correo", 
-                "Propuesta estratégica para {nombre} 🚀",
+                "Propuesta estratégica para {nombre}",
                 help="Puedes usar {nombre} para personalizar el asunto."
             )
             
@@ -54,12 +65,13 @@ def render_email_view(df_all):
                 "¿Tendrías 5 minutos para una breve llamada mañana?<br><br>"
                 "Atentamente,<br>"
                 "<b>Equipo de Crecimiento Onyx</b>",
-                height=300,
-                help="Variables disponibles: {nombre}, {nicho}, {ciudad}, {rating}"
+                height=280,
+                help="Variables disponibles: {nombre}, {nicho}, {ciudad}, {rating}, {decisor}, {link_agenda}"
             )
+            st.caption("Variables disponibles: `{nombre}` · `{nicho}` · `{ciudad}` · `{rating}` · `{decisor}` · `{link_agenda}`")
             
         with c2:
-            st.info("💡 **Segmentación Inteligente**\nSolo se procesarán leads que tengan un email válido detectado por el scraper.")
+            st.info("Se procesarán solo leads con un email válido detectado por el scraper.")
             
             # Filtrar leads que tienen email real
             df_with_email = df_all[
@@ -71,11 +83,17 @@ def render_email_view(df_all):
             
             leads_target = st.multiselect(
                 "Filtrar por estado del lead",
-                options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Sin WhatsApp"],
-                default=["Nuevo", "Sin WhatsApp"]
+                options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"],
+                default=["Nuevo", "Interesado"]
             )
             
             test_mode = st.toggle("🧪 Modo Simulación", value=True, help="Si está activo, no se enviarán correos reales.")
+
+            use_llm = st.toggle(
+                "✍️ Personalizar con IA local",
+                value=True,
+                help="Reescribe asunto y cuerpo para cada lead con Ollama. Tarda unos segundos más por envío.",
+            )
             
             # Aplicar filtros
             df_camp = df_with_email[df_with_email['estado'].isin(leads_target)]
@@ -109,7 +127,7 @@ def render_email_view(df_all):
                 # Lanzar el worker en un hilo separado
                 t = threading.Thread(
                     target=email_campaign_worker,
-                    args=(CAMP, leads_list, subject, msg_template, test_mode),
+                    args=(CAMP, leads_list, subject, msg_template, test_mode, use_llm),
                     daemon=True
                 )
                 

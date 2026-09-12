@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="row">
+    <b>Conexión</b>
+    <span class="pill {{ 'ok' if status.status == 'success' else ('bad' if status.status == 'error' else 'muted') }}">
+      {{ status.message }}
+    </span>
+  </div>
+  <form method="post" action="/whatsapp/start">
+    <div class="grid2">
+      <div>
+        <label>Plantilla del mensaje</label>
+        <textarea name="template" rows="7">Hola {nombre}, vi tu negocio en Maps y detecté una oportunidad para convertir más búsquedas en clientes.
+Tengo una propuesta breve y concreta. ¿Te interesa que te la comparta?</textarea>
+        <p class="muted small">Variables: {nombre} · {nicho} · {ciudad} · {rating}</p>
+      </div>
+      <div>
+        <label>Estados a contactar</label>
+        {% for option in ["Nuevo", "Contactado", "Interesado", "Cerrado"] %}
+        <label class="check"><input type="checkbox" name="states" value="{{ option }}"
+          {% if option == "Interesado" %}checked{% endif %}> {{ option }}</label>
+        {% endfor %}
+        <label style="margin-top:8px">Instancia de Evolution</label>
+        <input name="instance" value="{{ 'onyxbot' }}">
+        <label class="check" style="margin-top:10px"><input type="checkbox" name="only_without_web" checked> Solo empresas sin página web</label>
+        <label class="check"><input type="checkbox" name="test_mode" checked> Modo simulación (sin envíos reales)</label>
+        <div class="grid2" style="margin-top:8px">
+          <div><label>Pausa mínima (s)</label><input type="number" name="delay_min" value="120" min="0" max="600"></div>
+          <div><label>Pausa máxima (s)</label><input type="number" name="delay_max" value="300" min="0" max="900"></div>
+        </div>
+        <p style="margin-top:14px"><button type="submit">Iniciar campaña</button></p>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div id="whatsapp-live" hx-get="/whatsapp/progress" hx-trigger="load, every 1s" hx-swap="innerHTML"></div>
+{% endblock %}

@@ -150,4 +150,20 @@ def test_email_subject_is_personalized(monkeypatch, tmp_path):
 
 
 def test_visible_niche_expands_locally():
-    assert "Dentistas" in asyncio.run(expandir_query("Odontólogos"))
+    expanded = asyncio.run(expandir_query("Odontólogos"))
+    assert len(expanded) > 1, "El catálogo local debe expandir nichos visibles sin Ollama"
+    assert "dentista" in expanded or "Dentistas" in expanded
+
+
+def test_init_db_self_heals_columns_on_advanced_version(tmp_path):
+    db.DB_PATH = str(tmp_path / "selfheal.db")
+    db.init_db()
+    with db.open_conn() as conn:
+        conn.execute("ALTER TABLE leads DROP COLUMN follow_ups_sent")
+        conn.execute("UPDATE schema_version SET version = 999")
+
+    db.init_db()
+
+    with db.open_conn() as conn:
+        columns = [row[1] for row in conn.execute("PRAGMA table_info(leads)")]
+    assert "follow_ups_sent" in columns

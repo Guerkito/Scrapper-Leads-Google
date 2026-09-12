@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="kpis">
+  <div class="kpi"><b>{{ pending }}</b><span>Con web y sin decisor</span></div>
+  <div class="kpi"><b>{{ with_linkedin }}</b><span>Con LinkedIn en la lista</span></div>
+</div>
+
+<div class="panel" style="margin-top:18px">
+  <b>Enriquecer decisores</b>
+  <p class="muted small">El asistente lee la web de cada negocio y extrae nombre, cargo y LinkedIn (solo si la web lo enlaza). Tarda unos segundos por lead.</p>
+  <form class="inline" method="post" action="/decisions/start">
+    <div><label>Cantidad del lote</label><input type="number" name="limit" value="20" min="1" max="200"></div>
+    <button type="submit">Enriquecer lote</button>
+  </form>
+</div>
+
+<div id="decisions-live" hx-get="/decisions/progress" hx-trigger="load, every 2s" hx-swap="innerHTML"></div>
+
+<div class="panel">
+  <form class="inline" method="get" action="/decisions">
+    <div style="flex:1; min-width:240px"><label>Buscar</label><input name="q" value="{{ q }}" placeholder="Nombre o ciudad"></div>
+    <button class="secondary" type="submit">Filtrar</button>
+  </form>
+  <table>
+    <tr><th>Negocio</th><th>Decisor</th><th>Cargo</th><th>LinkedIn</th><th>Estado</th></tr>
+    {% for lead in rows %}
+    <tr>
+      <td><a href="/leads/{{ lead['id'] }}">{{ lead['nombre'] }}</a><div class="muted small">{{ lead['ciudad'] or '' }}</div></td>
+      <td>{{ lead['decisor_nombre'] or '—' }}</td>
+      <td>{{ lead['decisor_cargo'] or '—' }}</td>
+      <td>{% if lead['decisor_linkedin'] %}<a href="{{ lead['decisor_linkedin'] }}" target="_blank" rel="noopener">Perfil</a>{% else %}—{% endif %}</td>
+      <td><span class="pill muted">{{ lead['estado'] or 'Nuevo' }}</span></td>
+    </tr>
+    {% else %}
+    <tr><td class="muted" colspan="5">Todavía no hay decisores. Lanza un lote arriba.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

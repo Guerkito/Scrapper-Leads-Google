@@ -4,7 +4,7 @@ import pandas as pd
 from config import EVO_URL, EVO_API_KEY, EVO_INSTANCE
 from services.campaigns import CampState, campaign_worker
 from services.phone_utils import normalize_phone
-from ui.icons import title_html
+from ui.icons import title_html, svg_icon
 
 
 @st.fragment(run_every=1)
@@ -14,19 +14,30 @@ def _campaign_monitor(campaign):
             st.rerun()
         return
     st.session_state.wa_campaign_was_running = True
-    st.warning("Campaña en curso...")
-    st.progress(campaign.progress)
-    if campaign.countdown > 0:
-        st.info(f"Próximo envío en {campaign.countdown} segundos...")
-    with st.expander("Ver logs de campaña", expanded=True):
-        for level, msg in campaign.logs[-10:]:
-            getattr(st, level if level in {"success", "warning", "error"} else "caption")(msg)
-    if st.button("DETENER CAMPAÑA"):
-        campaign.stop = True
+    with st.container(border=True):
+        mc1, mc2 = st.columns([2.2, 1])
+        with mc1:
+            st.markdown(
+                "<span class='mission-status'>Campaña en curso</span>",
+                unsafe_allow_html=True,
+            )
+        with mc2:
+            if st.button("Detener campaña", type="secondary", width="stretch", key="stop_wa_campaign"):
+                campaign.stop = True
+        pr1, pr2 = st.columns(2)
+        with pr1:
+            st.metric("Progreso", f"{int(campaign.progress * 100)}%")
+        with pr2:
+            if campaign.countdown > 0:
+                st.metric("Próximo envío", f"{campaign.countdown}s")
+            else:
+                st.metric("Próximo envío", "ahora")
+        st.progress(campaign.progress)
+        with st.expander("Registro de campaña", expanded=True):
+            for level, msg in campaign.logs[-12:]:
+                getattr(st, level if level in {"success", "warning", "error"} else "caption")(msg)
 
 def render_whatsapp_view(df_all):
-    st.markdown(title_html("Campañas de WhatsApp (Evolution API)", "whatsapp", 3), unsafe_allow_html=True)
-
     if 'CAMP' not in st.session_state:
         st.session_state.CAMP = CampState()
     CAMP = st.session_state.CAMP
@@ -42,20 +53,21 @@ def render_whatsapp_view(df_all):
     pais_sel = st.session_state.get('pais_sel', 'Colombia')
 
     with st.container(border=True):
-        st.markdown(title_html("Configuración de Envío", "settings", 4), unsafe_allow_html=True)
+        st.markdown(title_html("Configuración de envío", "settings", 4), unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
             msg_template = st.text_area(
                 "Plantilla de Mensaje",
                 "Hola {nombre}, vi tu negocio en Maps y detecté una oportunidad para convertir más búsquedas en clientes. "
                 "Tengo una propuesta breve y concreta para mejorar tu presencia digital. ¿Te interesa que te la comparta?",
-                height=150,
+                height=160,
                 help="Usa {nombre} para personalizar el mensaje."
             )
+            st.caption("Variables disponibles: `{nombre}` · `{nicho}` · `{ciudad}` · `{rating}`")
         with c2:
             leads_target = st.multiselect(
                 "Filtrar leads para campaña",
-                options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Sin WhatsApp"],
+                options=["Nuevo", "Contactado", "Interesado", "Cerrado", "Descartado"],
                 default=["Interesado"]
             )
             test_mode = st.toggle("Modo Simulación (sin envíos reales)", value=True)
@@ -76,12 +88,26 @@ def render_whatsapp_view(df_all):
                     row.get('pais') if pd.notna(row.get('pais')) else pais_sel,
                 )), axis=1
             )]
+
+    # Resumen de audiencia
+    if not df_camp.empty:
+        preview = df_camp[['nombre', 'nicho', 'ciudad']].head(5).astype(str)
+        preview.columns = ['Empresa', 'Nicho', 'Ciudad']
+        st.markdown(title_html("Audiencia en cola", "users", 4), unsafe_allow_html=True)
+        ac1, ac2 = st.columns([0.35, 0.65])
+        with ac1:
             st.metric("Leads en cola", len(df_camp))
+        with ac2:
+            with st.expander("Vista previa", expanded=False):
+                st.dataframe(preview, width="stretch", hide_index=True, height=180)
+    else:
+        st.warning("No hay leads que cumplan los filtros seleccionados.")
 
     if CAMP.running:
         st.divider()
         _campaign_monitor(CAMP)
     else:
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
         if st.button("INICIAR CAMPAÑA", type="primary", width="stretch"):
             if df_camp.empty:
                 st.error("No hay leads seleccionados para la campaña.")

@@ -55,13 +55,18 @@ if not exist "venv_windows\installed.txt" (
 echo [🤖] Iniciando Webhook de IA en segundo plano...
 start /B python webhook.py
 
-:: 5. Lanzar Scraper
-echo [🚀] ¡Todo listo! El panel se abrira en tu navegador...
-echo ----------------------------------------------------------
-streamlit run app.py --server.port=8501 --server.headless=true --browser.gatherUsageStats=false --theme.base=dark
+:: 4b. Iniciar Agente de Email (respuestas y follow-ups)
+echo [✉️] Iniciando Agente de Email en segundo plano...
+start /B python email_agent.py
 
-if %errorlevel% neq 0 (
-    echo.
-    echo [!] Hubo un error al iniciar el programa.
-    pause
-)
+:: 4c. Iniciar Panel Web nuevo (FastAPI + HTMX)
+echo [🌐] Iniciando Panel Web en http://localhost:8502 ...
+start /B python -m uvicorn web.app:app --host 127.0.0.1 --port 8502
+
+:: 5. Abrir el panel web
+echo [🚀] ¡Todo listo! Abriendo el panel en tu navegador...
+echo ----------------------------------------------------------
+start http://localhost:8502
+echo El panel corre en http://localhost:8502
+echo Cierra esta ventana para detener los servicios.
+pause >nul

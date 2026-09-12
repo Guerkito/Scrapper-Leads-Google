@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acceso · ONYX</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="login-wrap">
+  <form class="panel login-card" method="post" action="/login">
+    <div class="logo" style="margin-bottom:16px"><span>LeadGen</span><b>ONYX</b></div>
+    {% if error %}<div class="flash warn">{{ error }}</div>{% endif %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>Contraseña del panel</label>
+    <input type="password" name="password" autofocus autocomplete="current-password">
+    <p style="margin-top:16px"><button type="submit" style="width:100%">Entrar</button></p>
+  </form>
+</div>
+</body>
+</html>

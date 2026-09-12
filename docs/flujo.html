@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ONYX LeadGen — Cómo funciona</title>
+<style>
+  :root {
+    --bg: #0B0F19; --panel: #141B2D; --panel2: #1A233A; --border: #232D45;
+    --text: #E6EAF2; --muted: #98A2B3; --red: #E5484D; --green: #46A758;
+    --blue: #5D9DF0; --amber: #F5A524; --violet: #A384F0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 22px 80px; }
+  .kicker { color: var(--red); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
+  h1 { font-size: 36px; margin: 4px 0 6px; }
+  h2 { font-size: 23px; margin: 40px 0 10px; border-left: 3px solid var(--red); padding-left: 12px; }
+  h3 { font-size: 16px; margin: 0 0 4px; }
+  p { color: #C7CEDC; }
+  .lead { color: var(--muted); font-size: 17px; max-width: 760px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin: 14px 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  code { background: #0A0E17; border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 14px; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); color: var(--muted); }
+  .pill.red { color: #FF9DA1; border-color: rgba(229,72,77,.5); background: rgba(229,72,77,.12); }
+  .pill.green { color: #86E29B; border-color: rgba(70,167,88,.5); background: rgba(70,167,88,.12); }
+  .pill.blue { color: #A8C8F8; border-color: rgba(93,157,240,.5); background: rgba(93,157,240,.12); }
+  .pill.amber { color: #F8C46A; border-color: rgba(245,165,36,.5); background: rgba(245,165,36,.12); }
+  .pill.violet { color: #C9B6FF; border-color: rgba(163,132,240,.5); background: rgba(163,132,240,.12); }
+
+  /* Pipeline horizontal */
+  .pipeline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 18px 0; }
+  .step {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 12px; font-size: 13px; white-space: nowrap;
+  }
+  .arrow { color: var(--red); font-weight: 700; }
+
+  /* Timeline vertical */
+  .timeline { position: relative; margin: 10px 0 0 14px; padding-left: 30px; }
+  .timeline::before {
+    content: ""; position: absolute; left: 10px; top: 8px; bottom: 8px; width: 2px;
+    background: linear-gradient(var(--red), var(--violet), var(--blue), var(--green));
+    opacity: .55;
+  }
+  .item { position: relative; margin-bottom: 18px; }
+  .item::before {
+    content: attr(data-n); position: absolute; left: -35px; top: 2px;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--bg);
+    border: 2px solid var(--red); color: var(--text); font-size: 12px;
+    display: flex; align-items: center; justify-content: center; font-weight: 700;
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ai { border-left: 3px solid var(--violet); }
+  .note { border-left: 3px solid var(--amber); }
+  a { color: var(--blue); }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } h1 { font-size: 28px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="kicker">Guía del sistema</div>
+  <h1>ONYX LeadGen — cómo funciona</h1>
+  <p class="lead">
+    De una idea («vendo páginas web») a reuniones agendadas: el sistema captura negocios,
+    encuentra al dueño, le escribe personalizado, responde por ti y confirma las reuniones.
+    Todo corre en tu máquina con IA local.
+  </p>
+
+  <div class="pipeline">
+    <span class="step">1 · Oferta + ICP</span><span class="arrow">→</span>
+    <span class="step">2 · Captura</span><span class="arrow">→</span>
+    <span class="step">3 · Limpieza</span><span class="arrow">→</span>
+    <span class="step">4 · Decisores</span><span class="arrow">→</span>
+    <span class="step">5 · Contacto</span><span class="arrow">→</span>
+    <span class="step">6 · Respuestas</span><span class="arrow">→</span>
+    <span class="step">7 · Reunión</span><span class="arrow">→</span>
+    <span class="step">8 · Optimizar</span>
+  </div>
+
+  <h2>El flujo, paso a paso</h2>
+  <div class="timeline">
+
+    <div class="item" data-n="1">
+      <div class="panel ai">
+        <h3>Tu oferta y tu cliente ideal (ICP)</h3>
+        <p class="small">
+          Pegas la web de tu negocio y la IA local la lee: qué vendes, tu propuesta,
+          los cargos a contactar y 2–4 tipos de cliente con sus términos de búsqueda.
+          Eso crea una «campaña» reutilizable con su fit score y su pitch.
+        </p>
+        <span class="pill violet">Ollama · local</span>
+      </div>
+    </div>
+
+    <div class="item" data-n="2">
+      <div class="panel">
+        <h3>Captura multi-fuente</h3>
+        <p class="small">
+          Busca en Google Maps y, según la campaña, en Páginas Amarillas, LinkedIn,
+          Instagram, Facebook, Doctoralia, TripAdvisor, Computrabajo, Yelp o Glassdoor.
+          Modos: <b>lista para llamar</b> (rápido, solo teléfonos), <b>completo</b>
+          (enriquece web: emails, redes, píxeles), <b>hunter</b> (solo negocios sin web)
+          y <b>cuadrículas</b> (barrido geográfico denso).
+        </p>
+        <span class="pill blue">Playwright + fuentes propias</span>
+      </div>
+    </div>
+
+    <div class="item" data-n="3">
+      <div class="panel">
+        <h3>Limpieza, identidad y prioridad</h3>
+        <p class="small">
+          Deduplica por <code>place_id</code> (o identidad nombre+ciudad+país), normaliza
+          teléfonos a E.164, calcula fit score por campaña y marca cada lead
+          (oro / bueno / frío). Todo queda en SQLite local.
+        </p>
+        <span class="pill green">Base de datos local</span>
+      </div>
+    </div>
+
+    <div class="item" data-n="4">
+      <div class="panel ai">
+        <h3>El decisor con nombre y apellido</h3>
+        <p class="small">
+          Para cada negocio con web, la IA la lee y extrae el dueño/gerente/fundador:
+          nombre, cargo y LinkedIn (solo si la web lo enlaza; nunca se lo inventa).
+          Así el correo deja de decir «Hola negocio» y dice «Hola Ana».
+        </p>
+        <span class="pill violet">Ollama · local</span>
+      </div>
+    </div>
+
+    <div class="item" data-n="5">
+      <div class="panel">
+        <h3>Primer contacto personalizado</h3>
+        <p class="small">
+          <b>Email:</b> con SMTP (Gmail) o proveedor gestionado (Resend). Antes de enviar,
+          la IA reescribe asunto y cuerpo para cada prospecto usando lo que sabe de él,
+          e incluye tu enlace de agenda.<br>
+          <b>WhatsApp:</b> vía Evolution API, con pausas anti-ban y simulación previa.
+          Hay límite diario de envíos para proteger tu dominio.
+        </p>
+        <span class="pill amber">SMTP / Resend · Evolution</span>
+      </div>
+    </div>
+
+    <div class="item" data-n="6">
+      <div class="panel ai">
+        <h3>Respuestas que se atienden solas</h3>
+        <p class="small">
+          Un agente revisa la bandeja (IMAP) y el WhatsApp entrante. Si alguien contesta,
+          la IA responde en tu nombre con tu tono, propone la llamada y comparte la agenda.
+          Si dice que no, se marca <code>no_contactar</code> y se detiene toda secuencia.
+          A quien no responde se le manda un recordatorio a los 3 días (máx. 2).
+        </p>
+        <span class="pill violet">Ollama · local</span>
+      </div>
+    </div>
+
+    <div class="item" data-n="7">
+      <div class="panel">
+        <h3>La reunión se confirma sola</h3>
+        <p class="small">
+          Cada 30 minutos el agente pregunta a la API de Cal.com si alguno de tus
+          prospectos agendó. Si reservó, el lead pasa a <b>Reunión</b> con fecha y enlace;
+          si cancela, vuelve a <b>Interesado</b>. Ya no marcas nada a mano.
+        </p>
+        <span class="pill blue">API de Cal.com</span>
+      </div>
+    </div>
+
+    <div class="item" data-n="8">
+      <div class="panel">
+        <h3>Medir y optimizar</h3>
+        <p class="small">
+          El panel muestra coste por lead, tasa de respuesta y reuniones por segmento.
+          La auto-optimización pausa los segmentos que no responden tras N contactos
+          y te dice cuáles escalar. Las búsquedas nuevas ya excluyen lo pausado.
+        </p>
+        <span class="pill green">Analítica propia</span>
+      </div>
+    </div>
+
+  </div>
+
+  <h2>Qué IA usa y para qué</h2>
+  <div class="panel">
+    <table>
+      <tr><th>Tarea</th><th>Modelo</th><th>Dónde corre</th></tr>
+      <tr><td>Leer tu web y crear tu oferta/ICP</td><td><code>qwen2.5:7b</code></td><td>Tu PC (Ollama)</td></tr>
+      <tr><td>Extraer decisor de la web del prospecto</td><td><code>qwen2.5:7b</code></td><td>Tu PC (Ollama)</td></tr>
+      <tr><td>Escribir cada correo personalizado</td><td><code>qwen2.5:7b</code></td><td>Tu PC (Ollama)</td></tr>
+      <tr><td>Responder WhatsApp y emails entrantes</td><td><code>qwen2.5:7b</code></td><td>Tu PC (Ollama)</td></tr>
+      <tr><td>Expandir términos de búsqueda raros</td><td><code>qwen2.5:7b</code></td><td>Tu PC (Ollama)</td></tr>
+    </table>
+    <p class="small muted" style="margin-top:10px">
+      Un solo modelo local hace todo. No hay claves de OpenAI ni coste por token;
+      se cambia con <code>OLLAMA_MODEL</code> en Configuración. Si Ollama está apagado,
+      el sistema sigue funcionando con plantillas (degrada, no se rompe).
+    </p>
+  </div>
+
+  <h2>Integraciones externas</h2>
+  <div class="panel">
+    <table>
+      <tr><th>Servicio</th><th>Para qué</th><th>Qué necesitas</th></tr>
+      <tr><td>Ollama</td><td>Toda la IA</td><td>Instalado local (ya está)</td></tr>
+      <tr><td>SMTP o Resend</td><td>Enviar correos</td><td>Gmail app-password o API key de Resend</td></tr>
+      <tr><td>IMAP</td><td>Leer respuestas</td><td>La misma cuenta de correo (IMAP activado)</td></tr>
+      <tr><td>Evolution API</td><td>WhatsApp</td><td>Docker local + número escaneado (ya está)</td></tr>
+      <tr><td>Cal.com</td><td>Confirmar reuniones</td><td>Cuenta gratis + API key</td></tr>
+      <tr><td>Telegram (opcional)</td><td>Avisarte al instante</td><td>Bot token (pendiente de activar)</td></tr>
+    </table>
+  </div>
+
+  <h2>Cal.com vs Calendly</h2>
+  <div class="grid2">
+    <div class="panel">
+      <h3>Cal.com <span class="pill green">integrado</span></h3>
+      <p class="small">
+        Agenda gratuita y open-source. Se conecta con una sola <b>API key</b>
+        (<code>CALCOM_API_KEY</code>) y una consulta directa: «¿tiene reservas este email?».
+        El mismo enlace se comparte en emails y WhatsApp.
+      </p>
+    </div>
+    <div class="panel">
+      <h3>Calendly <span class="pill amber">posible, más fricción</span></h3>
+      <p class="small">
+        También se puede, pero su API pide OAuth o un token personal y el UUID de tu
+        organización; son más pasos para el mismo resultado. Si ya vives en Calendly,
+        se añade como segundo proveedor sin cambiar nada del resto del flujo.
+      </p>
+    </div>
+  </div>
+
+  <h2>Cuánto cuesta</h2>
+  <div class="panel">
+    <table>
+      <tr><th>Pieza</th><th>Coste</th><th>Para qué</th></tr>
+      <tr><td><b>Cal.com Free</b></td><td><b>$0</b> · 1 usuario · reservas ilimitadas</td><td>Todo lo que necesitas: enlace de agenda + API key para confirmar reuniones</td></tr>
+      <tr><td>Cal.com Teams</td><td>$12/usuario/mes (anual)</td><td>Solo si algún día sumas vendedores o quitas la marca</td></tr>
+      <tr><td>Calendly</td><td>Gratis muy limitado (1 tipo de evento) · ~$10–16/usuario/mes</td><td>Alternativa; se puede integrar después</td></tr>
+      <tr><td>Ollama + <code>qwen2.5:7b</code></td><td>$0</td><td>Toda la IA, corre en tu PC</td></tr>
+      <tr><td>Evolution API / WhatsApp</td><td>$0 (self-hosted)</td><td>Envío y respuestas por WhatsApp</td></tr>
+      <tr><td>Gmail SMTP (app password)</td><td>$0 (con límites de Gmail)</td><td>Correos de campaña</td></tr>
+      <tr><td>Resend (opcional)</td><td>Gratis hasta ~3.000 correos/mes</td><td>Envío gestionado con mejor entregabilidad</td></tr>
+      <tr><td>VPS + dominio (solo si despliegas)</td><td>~$5/mes + ~$12/año</td><td>Solo para webhooks de rebotes y acceso remoto</td></tr>
+    </table>
+    <p class="small muted" style="margin-top:10px">
+      Operando como estás hoy (local + Cal.com free): <b>$0/mes</b>. Lo único que sube de precio
+      es escalar el correo (Resend/Dominio propio) y eso es opcional.
+    </p>
+  </div>
+
+  <h2>Poner Cal.com en marcha (5 minutos)</h2>
+  <div class="panel">
+    <table>
+      <tr><th>#</th><th>Paso</th><th>Dónde</th></tr>
+      <tr><td>1</td><td>Crea tu cuenta (gratis, con Google)</td><td><code>cal.com/signup</code></td></tr>
+      <tr><td>2</td><td>Crea el evento «Llamada de 10 minutos» (videollamada)</td><td>Event types → New</td></tr>
+      <tr><td>3</td><td>Copia tu enlace y pégalo en <code>CALCOM_LINK</code></td><td>Panel → Configuración</td></tr>
+      <tr><td>4</td><td>Crea la API key y pégala en <code>CALCOM_API_KEY</code></td><td>Settings → Developer → API keys (empieza con <code>cal_</code>)</td></tr>
+      <tr><td>5</td><td>Reinicia el panel y pulsa «Comprobar reuniones» para probar</td><td>Panel → Admin</td></tr>
+    </table>
+    <p class="small muted" style="margin-top:10px">
+      Prueba de extremo a extremo: pon un lead tuyo en estado <b>Interesado</b>, agenda tú mismo
+      en tu enlace con ese email, y pulsa «Comprobar reuniones». En segundos el lead debe pasar
+      a <b>Reunión</b> con fecha y enlace.
+    </p>
+  </div>
+
+  <h2>Datos y privacidad</h2>
+  <div class="panel note">
+    <p class="small">
+      Todo vive en <code>data/leads.db</code> (SQLite): leads, conversaciones, campañas y analítica.
+      La IA corre en tu PC, así que ni tus prospectos ni tu estrategia salen a un servicio de IA.
+      Solo salen los datos que tú envíes por correo/WhatsApp y las consultas a Cal.com.
+    </p>
+  </div>
+
+  <h2>El día a día</h2>
+  <div class="panel">
+    <table>
+      <tr><th>Cuándo</th><th>Qué haces</th></tr>
+      <tr><td>Una vez</td><td>Configuras Ollama, correo (SMTP/IMAP), WhatsApp (Evolution) y la API key de Cal.com.</td></tr>
+      <tr><td>Semanal</td><td>Lanzas búsquedas desde el panel; los agentes responden y agendan.</td></tr>
+      <tr><td>Cuando mires</td><td>CRM para revisar Interesados/Reuniones, Analítica para ver qué segmento escala o se pausa.</td></tr>
+    </table>
+    <p class="small muted" style="margin-top:12px">
+      Este documento vive en <code>docs/flujo.html</code> y se abre desde el panel:
+      <b>Sistema → Cómo funciona</b>.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

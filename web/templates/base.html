@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} · ONYX</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo"><span>LeadGen</span><b>ONYX</b></div>
+    {% for section, items in nav %}
+      <p class="nav-section">{{ section }}</p>
+      {% for label, href in items %}
+        <a class="nav-link {{ 'active' if path == href else '' }}" href="{{ href }}">{{ label }}</a>
+      {% endfor %}
+    {% endfor %}
+    {% if auth_enabled %}
+    <p class="sidebar-foot"><a href="/logout">Cerrar sesión</a></p>
+    {% else %}
+    <p class="sidebar-foot">Panel web v2 · sin contraseña (define PANEL_PASSWORD)</p>
+    {% endif %}
+  </aside>
+  <main class="content">
+    {% if msg %}<div class="flash {{ 'ok' if ok else 'warn' }}">{{ msg }}</div>{% endif %}
+    <header class="page-head">
+      <div class="kicker">{{ kicker }}</div>
+      <h1>{{ title }}</h1>
+      <p>{{ subtitle }}</p>
+    </header>
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

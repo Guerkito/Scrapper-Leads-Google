@@ -20,6 +20,7 @@ CITY_COORDS = {
     "Puerto Colombia":      (10.9925, -74.9556),
     "Bogotá":               (4.7110,  -74.0721),
     "Cartagena":            (10.3910, -75.4794),
+    "Cartagena de Indias":  (10.3910, -75.4794),
     "Magangué":             (9.2404,  -74.7589),
     "Turbaco":              (10.3283, -75.4086),
     "Arjona":               (10.2575, -75.3533),

@@ -1,7 +1,19 @@
-.PHONY: run setup stop clean
+.PHONY: run setup stop clean web streamlit deploy deploy-down
 
 run:
 	@bash lanzador.sh
+
+web:
+	@venv/bin/python -m uvicorn web.app:app --host 127.0.0.1 --port 8502 --reload
+
+streamlit:
+	@venv/bin/streamlit run app.py --server.port=8501 --server.headless=true --browser.gatherUsageStats=false --theme.base=dark
+
+deploy:
+	@docker compose -f docker-compose.app.yml up -d --build
+
+deploy-down:
+	@docker compose -f docker-compose.app.yml down
 
 setup:
 	@echo "Configurando entorno..."
@@ -16,6 +28,8 @@ stop:
 	@docker compose down
 	@echo "Matando procesos Python..."
 	@pkill -f webhook.py || true
+	@pkill -f email_agent.py || true
+	@pkill -f "uvicorn web.app" || true
 	@pkill -f streamlit || true
 
 clean:

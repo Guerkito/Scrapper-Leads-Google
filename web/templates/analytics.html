@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="kpis">
+  <div class="kpi"><b>{{ "{:,}".format(summary.total) }}</b><span>Correos enviados</span><small>{{ summary.hoy }} hoy</small></div>
+  <div class="kpi"><b>${{ "%.2f"|format(summary.coste_total) }}</b><span>Coste estimado</span><small>{{ cost_per_email }}/email</small></div>
+  <div class="kpi"><b>{{ (summary.tasa_respuesta * 100) | round | int }}%</b><span>Tasa de respuesta</span><small>{{ summary.respondieron }} de {{ summary.leads }}</small></div>
+  <div class="kpi"><b>{{ summary.reuniones }}</b><span>Reuniones confirmadas</span><small>vía Cal.com</small></div>
+  <div class="kpi"><b>{{ provider | upper }}</b><span>Proveedor</span><small>Límite diario: {{ daily_limit if daily_limit != '0' else 'sin límite' }}</small></div>
+</div>
+{% if chart_labels %}
+<div class="panel" style="margin-top:18px">
+  <b>Leads vs respuestas por segmento</b>
+  <canvas id="perfChart" height="110"></canvas>
+</div>
+<script>
+new Chart(document.getElementById('perfChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ chart_labels | tojson }},
+    datasets: [
+      { label: 'Leads', data: {{ chart_leads | tojson }}, backgroundColor: '#5D9DF0', borderRadius: 5 },
+      { label: 'Respondieron', data: {{ chart_replies | tojson }}, backgroundColor: '#46A758', borderRadius: 5 }
+    ]
+  },
+  options: {
+    plugins: { legend: { labels: { color: '#98A2B3' } } },
+    scales: {
+      x: { ticks: { color: '#98A2B3' }, grid: { display: false } },
+      y: { ticks: { color: '#98A2B3' }, grid: { color: '#232D45' }, beginAtZero: true }
+    }
+  }
+});
+</script>
+{% endif %}
+
+<div class="panel" style="margin-top:18px">
+  <div class="row">
+    <b>Rendimiento por campaña y segmento</b>
+    <form method="post" action="/analytics/optimize"><button type="submit">⚙️ Ejecutar optimización</button></form>
+  </div>
+  <table>
+    <tr><th>Campaña</th><th>Segmento</th><th>Leads</th><th>Contactados</th><th>Respondieron</th><th>Reuniones</th><th>Tasa</th><th>Correos</th><th>Coste/lead</th><th>Estado</th><th>Recomendación</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.product_label }}</td>
+      <td>{{ r.segment_label }}</td>
+      <td>{{ r.leads }}</td>
+      <td>{{ r.contactados }}</td>
+      <td>{{ r.respondieron }}</td>
+      <td>{{ r.reuniones }}</td>
+      <td>{{ (r.tasa_respuesta * 100) | round | int }}%</td>
+      <td>{{ r.emails }}</td>
+      <td>${{ "%.3f"|format(r.coste_por_lead) }}</td>
+      <td>{% if r.estado == 'pausado' %}<span class="pill bad">Pausado</span>{% else %}<span class="pill ok">Activo</span>{% endif %}</td>
+      <td>{% if r.recomendacion == 'pausar' %}⏸ Pausar{% elif r.recomendacion == 'escalar' %}🚀 Escalar{% else %}—{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td class="muted" colspan="11">Aún no hay oportunidades por campaña. Genera una oferta y lanza una búsqueda.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% if paused %}
+<div class="panel">
+  <b>Segmentos pausados</b>
+  <form method="post" action="/analytics/resume">
+    {% for r in paused %}
+    <label class="check"><input type="checkbox" name="segment" value="{{ r.product_key }}|{{ r.segment_key }}">
+      {{ r.product_label }} · {{ r.segment_label }}</label>
+    {% endfor %}
+    <p style="margin-top:10px"><button class="secondary" type="submit">Reanudar seleccionados</button></p>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

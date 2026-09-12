@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <b>⚡ Misiones ejecutadas</b>
+  <p class="muted small">Cada búsqueda que lanzaste, con sus leads exactos (atribución por misión).</p>
+  <table>
+    <tr><th>Nombre</th><th>Fecha</th><th>País</th><th>Nicho</th><th>Leads</th><th></th></tr>
+    {% for item in history %}
+    <tr>
+      <td><a href="/library/history/{{ item['id'] }}">{{ item['nombre'] or ((item['nicho'] or '')[:60] ~ ' · ' ~ (item['fecha'] or '')[:16]) }}</a></td>
+      <td class="small">{{ (item['fecha'] or '')[:16] }}</td>
+      <td class="small">{{ item['pais'] or '—' }}</td>
+      <td class="small">{{ (item['nicho'] or '')[:60] }}</td>
+      <td>{{ item['leads_count'] }}</td>
+      <td><a href="/library/history/{{ item['id'] }}">Abrir →</a></td>
+    </tr>
+    {% else %}
+    <tr><td class="muted" colspan="6">Todavía no has ejecutado búsquedas.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <b>📁 Búsquedas guardadas</b>
+  <p class="muted small">Configuraciones listas para volver a lanzar con un clic.</p>
+  <table>
+    <tr><th>Nombre</th><th>Carpeta</th><th>País</th><th>Nicho</th><th></th></tr>
+    {% for item in favorites %}
+    <tr>
+      <td>{{ item['nombre'] }}</td>
+      <td class="small">{{ item['carpeta'] or 'General' }}</td>
+      <td class="small">{{ item['pais'] or '—' }}</td>
+      <td class="small">{{ (item['nicho'] or '')[:80] }}</td>
+      <td style="white-space:nowrap">
+        <a class="btn" href="{{ item['apply_url'] }}">Usar</a>
+        <form method="post" action="/library/favorite/{{ item['id'] }}/delete" style="display:inline">
+          <button class="danger" type="submit" onclick="return confirm('¿Eliminar la búsqueda guardada?')">Borrar</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td class="muted" colspan="5">No tienes búsquedas guardadas. Créalas desde «Buscar clientes → Guardar búsqueda».</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

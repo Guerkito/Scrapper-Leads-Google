@@ -1,0 +1,33 @@
+{% if mission.running %}
+<div class="panel">
+  <div class="row">
+    <b><span class="pill live">Misión en curso</span></b>
+    <form method="post" action="/search/stop"><button class="danger" type="submit">Abortar</button></form>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><b>{{ mission.total_processed }}</b><span>Leads nuevos</span></div>
+    <div class="kpi"><b>{{ mission.total_duplicates }}</b><span>Duplicados</span></div>
+    {% if mission.cold_call_mode %}
+    <div class="kpi"><b>{{ mission.callable_phones_found }}</b><span>Teléfonos listos</span></div>
+    {% endif %}
+  </div>
+  {% if mission.logs %}
+  <pre class="logs">{{ mission.logs[-8:] | join('\n') }}</pre>
+  {% endif %}
+</div>
+{% else %}
+  {% if mission.last_summary %}
+  <div class="panel">
+    <b>Misión terminada:</b> {{ mission.last_summary.leads }} nuevos,
+    {{ mission.last_summary.dupes }} duplicados.
+    {% if mission.last_summary.error %}<span class="pill bad">{{ mission.last_summary.error }}</span>{% endif %}
+    <a href="/crm">Ver en CRM →</a>
+  </div>
+  {% endif %}
+  <script>
+    (function () {
+      var el = document.getElementById('mission-live');
+      if (el && el.hasAttribute('hx-trigger')) { el.removeAttribute('hx-trigger'); }
+    })();
+  </script>
+{% endif %}

@@ -36,3 +36,12 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# graphify's local knowledge graph — regenerable and contains private session notes.
+/graphify-out/
+
+# Editor-specific config (shared MCP config lives in .mcp.json).
+/.cursor/

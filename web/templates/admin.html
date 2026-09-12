@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="kpis">
+  <div class="kpi"><b>{{ stats.phone }}%</b><span>Con teléfono válido</span></div>
+  <div class="kpi"><b>{{ stats.email }}%</b><span>Con email</span></div>
+  <div class="kpi"><b>{{ stats.pais }}%</b><span>Con país</span></div>
+  <div class="kpi"><b>{{ stats.web }}%</b><span>Con web propia</span></div>
+</div>
+<p class="muted small">{{ stats.total }} leads · {{ duplicate_rows }} filas en grupos de identidad duplicada · base {{ db_mb }} MB</p>
+
+<div class="panel">
+  <b>Exportación y respaldo</b>
+  <div class="inline" style="margin-top:10px">
+    <a class="btn" href="/admin/export.csv">Exportar leads (CSV)</a>
+    <a class="btn secondary" href="/admin/backup.db">Descargar backup (.db)</a>
+    <form method="post" action="/admin/vacuum" style="display:inline">
+      <button class="secondary" type="submit">Compactar base de datos</button>
+    </form>
+    <form method="post" action="/admin/check-meetings" style="display:inline">
+      <button class="secondary" type="submit">Comprobar reuniones (Cal.com)</button>
+    </form>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="panel">
+    <b>Restaurar desde .db</b>
+    <p class="muted small">Reemplaza toda la base. Antes se guarda un respaldo automático en <code>data/backups</code>.</p>
+    <form method="post" action="/admin/restore" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".db" required>
+      <p style="margin-top:10px"><button class="danger" type="submit" onclick="return confirm('¿Restaurar la base desde este archivo?')">Restaurar sistema</button></p>
+    </form>
+  </div>
+  <div class="panel">
+    <b>Importar CSV / Excel</b>
+    <p class="muted small">Fusiona datos: columnas obligatorias <code>nombre</code> y <code>ciudad</code>. Máximo 100.000 filas.</p>
+    <form method="post" action="/admin/import" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".csv,.xlsx" required>
+      <p style="margin-top:10px"><button type="submit">Procesar e importar</button></p>
+    </form>
+  </div>
+</div>
+
+<div class="panel">
+  <b>Historial de campañas</b>
+  <table>
+    <tr><th>Campaña</th><th>Canal</th><th>Estado</th><th>Destinos</th><th>Inicio</th><th>Última actualización</th></tr>
+    {% for item in campaigns %}
+    <tr>
+      <td class="small">{{ item['campaign_id'][:12] }}</td>
+      <td>{{ item['channel'] }}</td>
+      <td>{{ item['status'] }}</td>
+      <td>{{ item['destinos'] }}</td>
+      <td class="small">{{ item['inicio'] }}</td>
+      <td class="small">{{ item['ultima'] }}</td>
+    </tr>
+    {% else %}
+    <tr><td class="muted" colspan="6">Todavía no hay campañas registradas.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <b>Zona de peligro</b>
+  <p class="muted small">Borra todos los leads de la base (mantiene configuración, campañas y logs).</p>
+  <form class="inline" method="post" action="/admin/wipe">
+    <div><label>Escribe ELIMINAR para confirmar</label><input name="confirm" placeholder="ELIMINAR"></div>
+    <button class="danger" type="submit">Borrar todos los leads</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="row">
+    <b>{{ record['nombre'] or ((record['nicho'] or '')[:70] ~ ' · ' ~ (record['fecha'] or '')[:16]) }}</b>
+    <span class="pill muted">{{ (record['fecha'] or '')[:16] }}</span>
+  </div>
+  <p class="muted small">
+    {{ record['pais'] or '' }} · {{ record['nicho'] or '' }}
+    {% if record['product_campaign'] %} · {{ record['product_campaign'] }}{% endif %}
+    {% if not record['mision_id'] %} · sin misión asociada{% endif %}
+  </p>
+  <form class="inline" method="post" action="/library/history/{{ record['id'] }}/rename">
+    <div style="flex:1; min-width:240px"><label>Nombre de la búsqueda</label>
+      <input name="nombre" value="{{ record['nombre'] or '' }}" placeholder="Ponle un nombre">
+    </div>
+    <button class="secondary" type="submit">Guardar nombre</button>
+  </form>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><b>{{ metrics.total }}</b><span>Leads de esta búsqueda</span></div>
+  <div class="kpi"><b>{{ metrics.callable }}</b><span>Listos para llamar</span></div>
+  <div class="kpi"><b>{{ metrics.oro }}</b><span>Alta prioridad (oro)</span></div>
+  <div class="kpi"><b>{{ metrics.sin_web }}</b><span>Sin web</span></div>
+</div>
+
+<div class="panel" style="margin-top:18px">
+  <table>
+    <tr><th>Negocio</th><th>Ciudad</th><th>Nicho</th><th>Teléfono</th><th>Email</th><th>Estado</th></tr>
+    {% for lead in rows %}
+    <tr>
+      <td><a href="/leads/{{ lead['id'] }}">{{ lead['nombre'] }}</a></td>
+      <td class="small">{{ lead['ciudad'] or '—' }}</td>
+      <td class="small">{{ lead['nicho'] or '—' }}</td>
+      <td class="small">{{ lead['telefono_e164'] or lead['telefono'] or '—' }}</td>
+      <td class="small">{{ lead['email'] or '—' }}</td>
+      <td><span class="pill muted">{{ lead['estado'] or 'Nuevo' }}</span></td>
+    </tr>
+    {% else %}
+    <tr><td class="muted" colspan="6">Esta búsqueda no tiene leads ligados a su misión.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% if record['mision_id'] %}
+<div class="panel">
+  <b>Zona de peligro</b>
+  <p class="muted small">Borra los {{ metrics.total }} leads de esta búsqueda (y sus oportunidades y eventos de campaña). No se puede deshacer.</p>
+  <form class="inline" method="post" action="/library/history/{{ record['id'] }}/delete">
+    <div><label>Escribe ELIMINAR para confirmar</label><input name="confirm" placeholder="ELIMINAR"></div>
+    <button class="danger" type="submit">Borrar leads de esta búsqueda</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

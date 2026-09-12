@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<div class="panel">
+  <form class="inline" method="get" action="/map">
+    <div>
+      <label>Estados</label>
+      <div style="display:flex; gap:12px; flex-wrap:wrap">
+        {% for name, style in legend.items() %}
+        <label class="check"><input type="checkbox" name="estados" value="{{ name }}"
+          {% if name in selected %}checked{% endif %}>
+          <span style="width:11px;height:11px;border-radius:50%;background:{{ style.color }};display:inline-block"></span>
+          {{ name }}</label>
+        {% endfor %}
+      </div>
+    </div>
+    <div><label>Rating mínimo</label><input type="number" step="0.1" min="0" max="5" name="min_rating" value="{{ min_rating }}"></div>
+    <button class="secondary" type="submit">Filtrar</button>
+  </form>
+  <p class="muted small">
+    {{ visible }} de {{ total_geo }} leads con coordenadas{% if visible > cap %} · mostrando {{ cap }}{% endif %}.
+  </p>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><b>{{ visible }}</b><span>Leads en mapa</span></div>
+  <div class="kpi"><b>{{ top_zone }}</b><span>Zona caliente</span></div>
+  <div class="kpi"><b>{{ gold }}</b><span>Objetivos oro</span></div>
+  <div class="kpi"><b>{{ coverage }}%</b><span>Cobertura geográfica</span></div>
+</div>
+
+<div class="panel" style="padding:0; overflow:hidden; margin-top:18px">
+  <div id="map" style="height:580px"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const points = {{ points | tojson }};
+const center = {{ center | tojson }};
+const map = L.map('map').setView([center.lat, center.lng], 12);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CARTO'
+}).addTo(map);
+
+function popupNode(p) {
+  const wrap = document.createElement('div');
+  wrap.style.minWidth = '200px';
+  const name = document.createElement('b');
+  name.textContent = p.nombre;
+  const meta = document.createElement('div');
+  meta.className = 'muted small';
+  meta.textContent = '★ ' + (p.rating || '—') + ' · ' + p.resenas + ' reseñas';
+  const place = document.createElement('div');
+  place.className = 'muted small';
+  place.textContent = [p.ciudad, p.nicho].filter(Boolean).join(' · ');
+  const estado = document.createElement('span');
+  estado.className = 'pill';
+  estado.textContent = p.estado;
+  estado.style.color = p.color;
+  estado.style.borderColor = p.color;
+  estado.style.marginTop = '6px';
+  estado.style.display = 'inline-block';
+  wrap.append(name, meta, place, estado);
+  if (p.telefono) {
+    const tel = document.createElement('div');
+    tel.className = 'muted small';
+    tel.style.marginTop = '6px';
+    tel.textContent = p.telefono;
+    wrap.append(tel);
+  }
+  if (p.wa) {
+    const wa = document.createElement('a');
+    wa.href = p.wa; wa.target = '_blank'; wa.rel = 'noopener';
+    wa.textContent = 'WhatsApp'; wa.className = 'btn';
+    wa.style.display = 'block'; wa.style.marginTop = '8px'; wa.style.textAlign = 'center';
+    wrap.append(wa);
+  }
+  if (p.maps_url) {
+    const gm = document.createElement('a');
+    gm.href = p.maps_url; gm.target = '_blank'; gm.rel = 'noopener';
+    gm.textContent = 'Ver en Google Maps';
+    gm.style.display = 'block'; gm.style.marginTop = '6px';
+    wrap.append(gm);
+  }
+  return wrap;
+}
+
+for (const p of points) {
+  L.circleMarker([p.lat, p.lng], {
+    radius: 8, color: p.color, fillColor: p.color, fillOpacity: 0.72, weight: 2,
+  }).addTo(map).bindPopup(popupNode(p));
+}
+</script>
+{% endblock %}

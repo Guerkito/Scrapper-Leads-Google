@@ -3,6 +3,7 @@ import folium
 import html as html_lib
 from urllib.parse import urlparse
 from streamlit_folium import st_folium
+from folium.plugins import HeatMap, MarkerCluster
 import pandas as pd
 from services.leads import get_wa_link
 from services.constants import STATUS_COLORS
@@ -48,7 +49,6 @@ def _build_popup(row, pais_sel, compact=False):
     return html
 
 def render_map_view(df_all):
-    st.markdown(title_html("Inteligencia Geográfica", "map", 3), unsafe_allow_html=True)
     pais_sel = st.session_state.get('pais_sel', 'Colombia')
 
     # Filtrado inicial de coordenadas
@@ -109,7 +109,8 @@ def render_map_view(df_all):
     """
     m.get_root().header.add_child(folium.Element(dark_popup_css))
     
-    # Añadir marcadores
+    # Añadir marcadores (agrupados en clústeres para mapas densos)
+    cluster = MarkerCluster(name="Leads", show=True).add_to(m)
     for _, row in df_f.iterrows():
         sc = _status_color(row['estado'])
         folium.CircleMarker(
@@ -121,7 +122,20 @@ def render_map_view(df_all):
             fill_color=sc['fill'],
             fill_opacity=0.7,
             weight=2
+        ).add_to(cluster)
+
+    # Mapa de calor: zonas calientes ponderadas por rating
+    heat_data = [
+        [row['lat'], row['lng'], row['rating_num']]
+        for _, row in df_f.iterrows()
+        if not (pd.isna(row['lat']) or pd.isna(row['lng']))
+    ]
+    if heat_data:
+        HeatMap(
+            heat_data, name="Calor", blur=18, radius=14,
+            min_opacity=0.35, gradient={0.2: "#3b2f8f", 0.5: "#8f2f8f", 0.8: "#e5484d", 1.0: "#ffd166"},
         ).add_to(m)
+        folium.LayerControl(collapsed=False).add_to(m)
     
     # Renderizar mapa
     st_folium(m, use_container_width=True, height=550, returned_objects=[])
@@ -146,15 +160,15 @@ def render_map_view(df_all):
     # Métricas Geográficas
     i1, i2, i3, i4 = st.columns(4)
     with i1:
-        st.markdown(kpi_card("Leads en Mapa", f"{len(df_f)}", "#FF0000", "Total visibles"), unsafe_allow_html=True)
+        st.markdown(kpi_card("Leads en Mapa", f"{len(df_f)}", "#E5484D", "Total visibles"), unsafe_allow_html=True)
     with i2:
         z_counts = df_f['zona'].value_counts()
         top_barrio = z_counts.idxmax() if not z_counts.empty else "N/A"
         if "coord:" in str(top_barrio): top_barrio = "Sector GPS"
-        st.markdown(kpi_card("Zona Caliente", f"{str(top_barrio)[:12]}", "#A06EC9", "Mayor densidad"), unsafe_allow_html=True)
+        st.markdown(kpi_card("Zona Caliente", f"{str(top_barrio)[:12]}", "#A384F0", "Mayor densidad"), unsafe_allow_html=True)
     with i3:
         oro_geos = len(df_f[df_f['calificacion'] == 'oro'])
-        st.markdown(kpi_card("Objetivos Oro", f"{oro_geos}", "#F5C518", "Alta prioridad"), unsafe_allow_html=True)
+        st.markdown(kpi_card("Objetivos Oro", f"{oro_geos}", "#F5A524", "Alta prioridad"), unsafe_allow_html=True)
     with i4:
         pct_visible = round((len(df_f) / len(df_map) * 100)) if not df_map.empty else 0
-        st.markdown(kpi_card("Cobertura", f"{pct_visible}%", "#FFFFFF", "Del total con coordenadas"), unsafe_allow_html=True)
+        st.markdown(kpi_card("Cobertura", f"{pct_visible}%", "#5D9DF0", "Del total con coordenadas"), unsafe_allow_html=True)

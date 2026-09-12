@@ -43,6 +43,7 @@ class Orchestrator:
         self.fuentes = fuentes
         self.log_callback = log_callback
         self.lead_callback = lead_callback
+        self.mision_id = None
         self.stop_requested = False
         self.callable_phones_found = 0
 
@@ -170,7 +171,7 @@ class Orchestrator:
                                 return
 
                             with open_conn() as conn:
-                                status = save_lead(lead_obj, conn)
+                                status = save_lead(lead_obj, conn, mision_id=self.mision_id)
                             if status >= 0 and cold_call_mode:
                                 callable_phone_ids.add(phone_id)
                                 self.callable_phones_found += 1
@@ -384,7 +385,7 @@ class Orchestrator:
                     async with self.semaphore:
                         lead_enriquecido = await extract_deep_data(lead, context)
                         with open_conn() as conn:
-                            save_lead(lead_enriquecido, conn)
+                            save_lead(lead_enriquecido, conn, mision_id=self.mision_id)
                         if self.lead_callback:
                             # None = enriquecimiento: no cuenta como nuevo ni duplicado.
                             self.lead_callback(lead_enriquecido, None)

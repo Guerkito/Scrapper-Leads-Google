@@ -53,8 +53,6 @@ def update_env_variable(key, value):
     os.environ[key] = str(value)
 
 def render_admin_view():
-    st.markdown(title_html("Administración de Base de Datos", "settings", 3), unsafe_allow_html=True)
-
     df_all = load_all_leads()
 
     st.markdown(title_html("Calidad de Datos", "chart", 4), unsafe_allow_html=True)

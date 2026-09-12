@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 from streamlit.testing.v1 import AppTest
@@ -192,7 +195,7 @@ def test_navigation_runs_once_and_database_initializes_once(monkeypatch):
     monkeypatch.setattr(lead_service, "load_all_leads", lambda: _ui_leads())
     monkeypatch.setattr(whatsapp_service, "check_whatsapp_connection", fake_whatsapp)
 
-    app = AppTest.from_file("app.py", default_timeout=20)
+    app = AppTest.from_file(str(Path(__file__).resolve().parent.parent / "app.py"), default_timeout=20)
     app.run()
     assert len(app.exception) == 0
     assert counts == {"db": 1, "whatsapp": 1}
@@ -230,7 +233,7 @@ def test_crm_offers_filtered_and_portfolio_batch_exports(monkeypatch):
         ),
     )
 
-    app = AppTest.from_file("app.py", default_timeout=20).run()
+    app = AppTest.from_file(str(Path(__file__).resolve().parent.parent / "app.py"), default_timeout=20).run()
     next(button for button in app.button if button.label == "CRM").click().run()
 
     export_mode = next(
@@ -284,7 +287,7 @@ def test_product_campaign_filters_search_targets(monkeypatch):
         lambda *_args, **_kwargs: {"status": "info", "message": "diagnóstico"},
     )
 
-    app = AppTest.from_file("app.py", default_timeout=20).run()
+    app = AppTest.from_file(str(Path(__file__).resolve().parent.parent / "app.py"), default_timeout=20).run()
     product = next(
         widget for widget in app.selectbox
         if widget.label == "1. ¿Qué quieres vender?"
@@ -319,7 +322,7 @@ def test_onyx_service_campaign_configures_focused_search(monkeypatch):
         lambda *_args, **_kwargs: {"status": "info", "message": "diagnóstico"},
     )
 
-    app = AppTest.from_file("app.py", default_timeout=20).run()
+    app = AppTest.from_file(str(Path(__file__).resolve().parent.parent / "app.py"), default_timeout=20).run()
     product = next(
         widget for widget in app.selectbox
         if widget.label == "1. ¿Qué quieres vender?"
@@ -359,7 +362,7 @@ def test_search_call_to_action_waits_for_a_target(monkeypatch):
         lambda *_args, **_kwargs: {"status": "info", "message": "diagnóstico"},
     )
 
-    app = AppTest.from_file("app.py", default_timeout=20).run()
+    app = AppTest.from_file(str(Path(__file__).resolve().parent.parent / "app.py"), default_timeout=20).run()
     create_button = next(
         button for button in app.button if button.label == "Crear lista para llamar"
     )

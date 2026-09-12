@@ -135,7 +135,7 @@ def open_conn():
     return conn
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 11
 
 
 def _get_schema_version(conn):
@@ -208,10 +208,18 @@ def _migrate(conn, current_version):
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_place_id "
             "ON leads(place_id) WHERE place_id IS NOT NULL"
         )
-        conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_nombre_ciudad_no_pid "
-            "ON leads(nombre, ciudad) WHERE place_id IS NULL"
-        )
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_nombre_ciudad_no_pid "
+                "ON leads(nombre, ciudad) WHERE place_id IS NULL"
+            )
+        except sqlite3.IntegrityError:
+            logger.warning("Duplicados (nombre, ciudad) sin place_id; fusionando filas antes del índice v4.")
+            _consolidate_identity_duplicates_legacy(conn)
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_nombre_ciudad_no_pid "
+                "ON leads(nombre, ciudad) WHERE place_id IS NULL"
+            )
 
     if current_version < 5:
         # v5: regex de place_id corregida (captura el segundo `0x` completo).
@@ -264,11 +272,20 @@ def _migrate(conn, current_version):
         # El indice anterior mezclaba ciudades homonimas de paises diferentes.
         conn.execute("DROP INDEX IF EXISTS idx_unique_nombre_ciudad_no_pid")
         _consolidate_normalized_identity_duplicates(conn)
-        conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_identity_no_pid ON leads("
-            "lower(trim(nombre)), lower(trim(COALESCE(ciudad, ''))), "
-            "lower(trim(COALESCE(pais, '')))) WHERE place_id IS NULL"
-        )
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_identity_no_pid ON leads("
+                "lower(trim(nombre)), lower(trim(COALESCE(ciudad, ''))), "
+                "lower(trim(COALESCE(pais, '')))) WHERE place_id IS NULL"
+            )
+        except sqlite3.IntegrityError:
+            logger.warning("Duplicados de identidad tras migración v6; fusionando antes del índice.")
+            _consolidate_normalized_identity_duplicates(conn)
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_identity_no_pid ON leads("
+                "lower(trim(nombre)), lower(trim(COALESCE(ciudad, ''))), "
+                "lower(trim(COALESCE(pais, '')))) WHERE place_id IS NULL"
+            )
 
         rows = conn.execute(
             "SELECT id, telefono, pais FROM leads "
@@ -288,6 +305,40 @@ def _migrate(conn, current_version):
         # v7 agrega oportunidades por producto en una tabla separada durante init_db.
         # No se añaden columnas al lead: un negocio puede servir a varias campañas.
         pass
+
+    if current_version < 8:
+        # v8: atribución de leads a la misión/búsqueda que los capturó.
+        if "mision_id" not in existing_cols:
+            conn.execute("ALTER TABLE leads ADD COLUMN mision_id TEXT")
+            existing_cols.add("mision_id")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_mision ON leads(mision_id)")
+
+    if current_version < 9:
+        # v9: seguimiento automático de correos fríos.
+        if "follow_ups_sent" not in existing_cols:
+            conn.execute("ALTER TABLE leads ADD COLUMN follow_ups_sent INTEGER DEFAULT 0")
+            existing_cols.add("follow_ups_sent")
+
+    if current_version < 10:
+        # v10: decisor a nivel persona (nombre, cargo y LinkedIn verificable).
+        for col, type_def in {
+            "decisor_nombre": "TEXT",
+            "decisor_cargo": "TEXT",
+            "decisor_linkedin": "TEXT",
+        }.items():
+            if col not in existing_cols:
+                conn.execute(f"ALTER TABLE leads ADD COLUMN {col} {type_def}")
+                existing_cols.add(col)
+
+    if current_version < 11:
+        # v11: reunión confirmada por la agenda (Cal.com).
+        for col, type_def in {
+            "reunion_at": "TEXT",
+            "reunion_url": "TEXT",
+        }.items():
+            if col not in existing_cols:
+                conn.execute(f"ALTER TABLE leads ADD COLUMN {col} {type_def}")
+                existing_cols.add(col)
 
 
 def _rebuild_table_without_unique_nombre_ciudad(conn):
@@ -415,6 +466,44 @@ def _consolidate_place_id_duplicates(conn):
         )
 
 
+def _consolidate_identity_duplicates_legacy(conn):
+    """Fusiona duplicados exactos de (nombre, ciudad) sin place_id (bases pre-v4)."""
+    groups = conn.execute(
+        """
+        SELECT GROUP_CONCAT(id) FROM leads
+        WHERE place_id IS NULL
+        GROUP BY lower(trim(nombre)), lower(trim(COALESCE(ciudad, '')))
+        HAVING COUNT(*) > 1
+        """
+    ).fetchall()
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(leads)")]
+    for (ids_csv,) in groups:
+        ids = sorted(int(value) for value in ids_csv.split(","))
+        keep_id = ids[0]
+        keep_row = conn.execute("SELECT * FROM leads WHERE id = ?", (keep_id,)).fetchone()
+        merged = dict(zip(columns, keep_row))
+        for drop_id in ids[1:]:
+            row = conn.execute("SELECT * FROM leads WHERE id = ?", (drop_id,)).fetchone()
+            other = dict(zip(columns, row))
+            for column in columns:
+                if column in {"id", "place_id"}:
+                    continue
+                if column == "fuentes_encontrado":
+                    merged[column] = json.dumps(list(dict.fromkeys(
+                        _json_list(merged.get(column)) + _json_list(other.get(column))
+                    )), ensure_ascii=False)
+                elif column in {"rating", "reseñas"}:
+                    merged[column] = max(merged.get(column) or 0, other.get(column) or 0)
+                elif not _meaningful(merged.get(column)) and _meaningful(other.get(column)):
+                    merged[column] = other[column]
+        update_columns = [column for column in columns if column != "id"]
+        conn.execute(
+            f"UPDATE leads SET {','.join(f'{column} = ?' for column in update_columns)} WHERE id = ?",
+            [merged.get(column) for column in update_columns] + [keep_id],
+        )
+        conn.executemany("DELETE FROM leads WHERE id = ?", [(value,) for value in ids[1:]])
+
+
 def _consolidate_normalized_identity_duplicates(conn):
     """Fusiona variantes de mayusculas/espacios antes de crear el indice v6."""
     groups = conn.execute(
@@ -513,6 +602,22 @@ def init_db():
         _migrate(conn, current)
         _set_schema_version(conn, SCHEMA_VERSION)
 
+    # Autocorrección: una copia restaurada con la versión adelantada no debe
+    # quedarse sin columnas nuevas (la versión guardada no se recalcula hacia atrás).
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(leads)").fetchall()}
+    for column, type_def in {
+        "mision_id": "TEXT",
+        "follow_ups_sent": "INTEGER DEFAULT 0",
+        "decisor_nombre": "TEXT",
+        "decisor_cargo": "TEXT",
+        "decisor_linkedin": "TEXT",
+        "reunion_at": "TEXT",
+        "reunion_url": "TEXT",
+    }.items():
+        if column not in existing:
+            logger.warning(f"Base de datos: columna {column} ausente; añadiéndola.")
+            conn.execute(f"ALTER TABLE leads ADD COLUMN {column} {type_def}")
+
     # Índices (idempotentes y baratos)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ciudad ON leads(ciudad)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_nicho ON leads(nicho)")
@@ -527,11 +632,24 @@ def init_db():
         "ON leads(place_id) WHERE place_id IS NOT NULL"
     )
     conn.execute("DROP INDEX IF EXISTS idx_unique_nombre_ciudad_no_pid")
-    conn.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_identity_no_pid ON leads("
-        "lower(trim(nombre)), lower(trim(COALESCE(ciudad, ''))), "
-        "lower(trim(COALESCE(pais, '')))) WHERE place_id IS NULL"
-    )
+    try:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_identity_no_pid ON leads("
+            "lower(trim(nombre)), lower(trim(COALESCE(ciudad, ''))), "
+            "lower(trim(COALESCE(pais, '')))) WHERE place_id IS NULL"
+        )
+    except sqlite3.IntegrityError:
+        # Bases restauradas o importadas pueden traer identidades duplicadas;
+        # consolidarlas primero evita que la app no arranque.
+        logger.warning(
+            "Identidades duplicadas detectadas; consolidando antes de crear el índice único."
+        )
+        _consolidate_normalized_identity_duplicates(conn)
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_identity_no_pid ON leads("
+            "lower(trim(nombre)), lower(trim(COALESCE(ciudad, ''))), "
+            "lower(trim(COALESCE(pais, '')))) WHERE place_id IS NULL"
+        )
 
     conn.execute('''CREATE TABLE IF NOT EXISTS bot_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -552,10 +670,11 @@ def init_db():
     history_columns = {
         row[1] for row in conn.execute("PRAGMA table_info(search_history)").fetchall()
     }
-    for column in ("product_campaign", "target_segments"):
+    for column in ("product_campaign", "target_segments", "mision_id", "nombre"):
         if column not in history_columns:
             conn.execute(f"ALTER TABLE search_history ADD COLUMN {column} TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_history_fecha ON search_history(fecha)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_history_mision ON search_history(mision_id)")
 
     conn.execute('''CREATE TABLE IF NOT EXISTS search_favorites (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -573,7 +692,7 @@ def init_db():
     favorite_columns = {
         row[1] for row in conn.execute("PRAGMA table_info(search_favorites)").fetchall()
     }
-    for column in ("product_campaign", "target_segments", "cold_call_mode", "hunter_mode"):
+    for column in ("product_campaign", "target_segments", "cold_call_mode", "hunter_mode", "carpeta"):
         if column not in favorite_columns:
             conn.execute(f"ALTER TABLE search_favorites ADD COLUMN {column} TEXT")
 
@@ -640,6 +759,29 @@ def init_db():
         received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         error TEXT
+    )''')
+
+    conn.execute('''CREATE TABLE IF NOT EXISTS email_sends (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        destino TEXT NOT NULL,
+        provider TEXT,
+        status TEXT NOT NULL DEFAULT 'sent',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_email_sends_destino ON email_sends(lower(destino))"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_email_sends_fecha ON email_sends(created_at)"
+    )
+
+    conn.execute('''CREATE TABLE IF NOT EXISTS segment_status (
+        product_key TEXT NOT NULL,
+        segment_key TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        reason TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (product_key, segment_key)
     )''')
 
     # Limpieza proactiva de teléfonos mal formateados o con caracteres extraños en la base de datos
@@ -871,8 +1013,11 @@ def _find_existing_id(conn, lead, place_id: str | None) -> int | None:
     return None
 
 
-def save_lead(lead, conn):
+def save_lead(lead, conn, mision_id=None):
     """Inserta o enriquece un lead (objeto `Lead`).
+
+    `mision_id` identifica la búsqueda que capturó el lead (atribución exacta).
+    En un merge (duplicado) NO se sobreescribe: el lead conserva su primera misión.
 
     Retorna:
       1 si es un lead NUEVO insertado.
@@ -928,8 +1073,8 @@ def save_lead(lead, conn):
                 email, sitio_web, perfil_url, tiene_web,
                 rating, reseñas, maps_url, place_id, nicho, sector, tipo, fuente, fuentes_encontrado, nit,
                 calificacion, lat, lng, instagram, facebook, linkedin_empresa,
-                pixel_fb, pixel_google, decisor, verificado, raw_data)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                pixel_fb, pixel_google, decisor, verificado, raw_data, mision_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 lead.nombre, lead.ciudad, getattr(lead, "departamento", None),
@@ -941,6 +1086,7 @@ def save_lead(lead, conn):
                 lead.nit, lead.calificacion, lead.lat, lead.lng,
                 lead.instagram, lead.facebook, lead.linkedin_empresa,
                 lead.pixel_fb, lead.pixel_google, lead.decisor, lead.verificado, raw_json,
+                mision_id,
             ),
         )
         _save_lead_opportunity(conn, cursor.lastrowid, lead)
@@ -1270,20 +1416,21 @@ def load_known_identifiers(ciudad: str, conn) -> tuple[set, set]:
 
 def save_search_history(
     ciudad, pais, nicho, zona, leads_nuevos, leads_duplicados, conn,
-    product_campaign=None, target_segments=None,
+    product_campaign=None, target_segments=None, mision_id=None,
 ):
     """Historial de búsqueda."""
     conn.execute(
         """
         INSERT INTO search_history
             (fecha, ciudad, pais, nicho, zona, leads_nuevos, leads_duplicados,
-             product_campaign, target_segments)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             product_campaign, target_segments, mision_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
             ciudad, pais, nicho, zona, leads_nuevos, leads_duplicados,
             product_campaign, json.dumps(target_segments or [], ensure_ascii=False),
+            mision_id,
         )
     )
     conn.commit()
